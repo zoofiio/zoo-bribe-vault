@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../settings/ProtocolOwner.sol";
 
-contract MarginToken is ProtocolOwner, ERC20, ReentrancyGuard {
+contract YToken is ProtocolOwner, ERC20, ReentrancyGuard {
   using SafeMath for uint256;
 
   IProtocolSettings public immutable settings;

@@ -13,8 +13,6 @@ import "./settings/ProtocolSettings.sol";
 contract ZooProtocol is IZooProtocol, Ownable, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  address internal _usdToken;
-
   EnumerableSet.AddressSet internal _assetTokens;
   EnumerableSet.AddressSet internal _vaults;
   mapping(address => EnumerableSet.AddressSet) _assetTokenToVaults;
@@ -29,25 +27,9 @@ contract ZooProtocol is IZooProtocol, Ownable, ReentrancyGuard {
     return owner();
   }
 
-  function usdToken() public view override returns (address) {
-    return _usdToken;
-  }
-
-  /* ========== RESTRICTED FUNCTIONS ========= */
-
-  function initialize(address _usdToken_) external nonReentrant onlyOwner {
-    require(!initialized, "Already initialized");
-    require(_usdToken_ != address(0), "Zero address detected");
-
-    _usdToken = _usdToken_;
-
-    initialized = true;
-    emit Initialized();
-  }
-
   /* ========== Vault Operations ========== */
 
-  function addVault(address vault) external nonReentrant onlyOwner onlyInitialized {
+  function addVault(address vault) external nonReentrant onlyOwner {
     require(!_vaults.contains(vault), "Vault already added");
     _vaults.add(vault);
 
@@ -83,16 +65,7 @@ contract ZooProtocol is IZooProtocol, Ownable, ReentrancyGuard {
     return _assetTokenToVaults[assetToken].values();
   }
 
-  /* ============== MODIFIERS =============== */
-
-  modifier onlyInitialized() {
-    require(initialized, "Not initialized yet");
-    _;
-  }
-
   /* =============== EVENTS ============= */
-
-  event Initialized();
 
   event VaultAdded(address indexed assetToken, address vault);
 }

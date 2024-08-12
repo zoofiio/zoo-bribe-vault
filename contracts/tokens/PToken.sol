@@ -17,6 +17,10 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   IProtocolSettings public immutable settings;
 
+  address public vault;
+  string internal _name_;
+  string internal _symbol_;
+
   uint256 private _totalSupply;
 
   uint256 private _totalShares;
@@ -24,20 +28,22 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   mapping (address => mapping (address => uint256)) private _allowances;
 
-  constructor(address _protocol, address _settings) ProtocolOwner(_protocol) {
+  constructor(address _protocol, address _settings, string memory _name, string memory _symbol) ProtocolOwner(_protocol) ERC20(_name, _symbol) {
     require(_protocol != address(0) && _settings != address(0), "Zero address detected");
 
     settings = IProtocolSettings(_settings);
+    _name_ = _name;
+    _symbol_ = _symbol;
   }
 
   /* ================= IERC20Metadata ================ */
 
-  function name() public pure returns (string memory) {
-    return 'Zoo USD';
+  function name() public view virtual override returns (string memory) {
+    return _name_;
   }
 
-  function symbol() public pure returns (string memory) {
-    return 'zUSD';
+  function symbol() public view virtual override returns (string memory) {
+    return _symbol_;
   }
 
   function decimals() public pure returns (uint8) {
@@ -115,7 +121,25 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return true;
   }
 
-  /* ================= IUsd Functions ================ */
+  /* ========== RESTRICTED FUNCTIONS ========== */
+
+  function setName(string memory _name) external nonReentrant onlyOwner {
+    _name_ = _name;
+  }
+
+  function setSymbol(string memory _symbol) external nonReentrant onlyOwner {
+    _symbol_ = _symbol;
+  }
+
+  function setVault(address _vault) external nonReentrant onlyOwner {
+    require(vault == address(0), "Vault already set");
+    require(_vault != address(0), "Zero address detected");
+
+    vault = _vault;
+    emit SetVault(vault);
+  }
+
+  /* ================= IPToken Functions ================ */
 
   function mint(address to, uint256 amount) external nonReentrant onlyVault returns (uint256) {
     require(to != address(0), "Zero address detected");
@@ -225,8 +249,11 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     emit TransferShares(from, to, sharesAmount);
   }
 
-  modifier onlyVault() virtual {
-    require (IZooProtocol(protocol).isVault(_msgSender()), "Caller is not a Vault contract");
+  /* ============== MODIFIERS =============== */
+
+  modifier onlyVault() {
+    require(vault != address(0), "Vault not set");
+    require(vault == _msgSender(), "Caller is not Vault");
     _;
   }
 
@@ -234,4 +261,5 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   event TransferShares(address indexed from, address indexed to, uint256 sharesValue);
   event Rebased(uint256 addedSupply);
+  event SetVault(address indexed vault);
 }
