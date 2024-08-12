@@ -6,11 +6,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../interfaces/IProtocolSettings.sol";
-import "../interfaces/IUsd.sol";
+import "../interfaces/IPToken.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
 
-contract Usd is IUsd, ProtocolOwner, ReentrancyGuard {
+contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   using SafeMath for uint256;
 
   uint256 constant internal INFINITE_ALLOWANCE = type(uint256).max;

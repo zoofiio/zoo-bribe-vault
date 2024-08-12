@@ -30,30 +30,10 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
   constructor(address _protocol_, address _treasury_) ProtocolOwner(_protocol_) {
     _treasury = _treasury_;
 
-    // Redemption fee rate. Default to 0.5%. [0, 10%]
-    _upsertParamConfig("C", 5 * 10 ** 7, 0, 10 ** 9);
-    // Treasury fee rate. Default to 50%. [0, 100%]
-    _upsertParamConfig("TreasuryFeeRate", 5 * 10 ** 9, 0, 10 ** 10);
-    _upsertParamConfig("PtyPoolBuyLowFeeRate", 5 * 10 ** 9, 0, 10 ** 10);
-    _upsertParamConfig("PtyPoolBuyLowMarginYieldsRate", 5 * 10 ** 9, 0, 10 ** 10);
-    // Yield rate. Default to 3.5%, [0, 50%]
-    _upsertParamConfig("Y", 35 * 10 ** 7, 0, 5 * 10 ** 9);
-    // Rate of r change per hour. Default to 0.001, [0, 1]
-    _upsertParamConfig("RateR", 10 ** 7, 0, 10 ** 10);
-    // Circuit breaker period. Default to 1 hour, [1 minute, 1 day]
-    _upsertParamConfig("CircuitBreakPeriod", 1 hours, 1 minutes, 1 days);
-    // Target AAR. Default 150%, [100%, 1000%]
-    _upsertParamConfig("AART", 15 * 10 ** 9, 10 ** 10, 10 ** 11);
-    // Safe AAR. Default 130%, [100%, 1000%]
-    _upsertParamConfig("AARS", 13 * 10 ** 9, 10 ** 10, 10 ** 11);
-    // Upper AAR. Default 200%, [100%, 1000%]
-    _upsertParamConfig("AARU", 2 * 10 ** 10, 10 ** 10, 10 ** 11);
-    // Circuit Breaker AAR. Default 110%, [100%, 1000%]
-    _upsertParamConfig("AARC", 11 * 10 ** 9, 10 ** 10, 10 ** 11);
-    // Price Trigger Yield pool, min $zUSD dust amount. Default 1000 $zUSD, [0, 1000000]
-    _upsertParamConfig("PtyPoolMinUsdAmount", 1000 * 10 ** 10, 0, 1000000 * 10 ** 10);
-    // Price Trigger Yield pool, min asset dust amount. Default 0.1, [0, 1000000]
-    _upsertParamConfig("PtyPoolMinAssetAmount", 10 ** 9, 0, 1000000 * 10 ** 10);
+    // Treasury fee rate. Default to 0%. [0, 10%]
+    _upsertParamConfig("TreasuryFeeRate", 0, 0, 10 ** 9);
+    // Round perioud. Default to 90 days, [1 day, 1 year]
+    _upsertParamConfig("RoundPeriod", 90 days, 1 days, 365 days);
   }
 
   /* ============== VIEWS =============== */
