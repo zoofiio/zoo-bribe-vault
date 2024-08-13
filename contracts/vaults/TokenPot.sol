@@ -8,6 +8,7 @@ import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 import "../settings/ProtocolOwner.sol";
 import "../interfaces/IProtocolSettings.sol";
+import "../interfaces/IPToken.sol";
 import "../interfaces/IZooProtocol.sol";
 
 contract TokenPot is Context, ReentrancyGuard {
@@ -42,6 +43,16 @@ contract TokenPot is Context, ReentrancyGuard {
     emit Withdrawn(_msgSender(), recipient, token, amount);
   }
 
+  function withdrawPTokenShares(address recipient, address token, uint256 sharesAmount) external nonReentrant onlyOwner {
+    require(recipient != address(0) && token != address(0), "Zero address detected");
+
+    uint256 amount = IPToken(token).getBalanceByShares(sharesAmount);
+    require(amount > 0 && amount <= balance(token), "Invalid amount");
+    IPToken(token).transferShares(recipient, sharesAmount);
+
+    emit WithdrawnPTokenShares(_msgSender(), recipient, token, sharesAmount, amount);
+  }
+
   modifier onlyOwner() {
     require(_msgSender() == owner, "TokenPot: caller is not the owner");
     _;
@@ -49,4 +60,5 @@ contract TokenPot is Context, ReentrancyGuard {
   /* =============== EVENTS ============= */
 
   event Withdrawn(address indexed withdrawer, address indexed recipient, address indexed token, uint256 amount);
+  event WithdrawnPTokenShares(address indexed withdrawer, address indexed recipient, address indexed token, uint256 sharesAmount, uint256 amount);
 }

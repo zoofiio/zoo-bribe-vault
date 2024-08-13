@@ -173,6 +173,19 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return sharesAmount;
   }
 
+  function burnShares(address account, uint256 sharesAmount) external nonReentrant onlyVault returns (uint256) {
+    require(account != address(0), "Zero address detected");
+    require(sharesAmount > 0, 'Amount too small');
+
+    uint256 amount = getBalanceByShares(sharesAmount);
+    _burnShares(account, sharesAmount);
+    _totalSupply = _totalSupply.sub(amount);
+
+    _emitTransferEvents(account, address(0), amount, sharesAmount);
+
+    return amount;
+  }
+
   function transferShares(address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
     _transferShares(_msgSender(), to, sharesAmount);
     uint256 tokensAmount = getBalanceByShares(sharesAmount);

@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-interface IMarginToken is IERC20 {
+interface IYToken is IERC20 {
 
   function mint(address to, uint256 amount) external;
 

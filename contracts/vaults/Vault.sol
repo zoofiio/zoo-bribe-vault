@@ -36,6 +36,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
+  mapping(address => Constants.RedeemByPToken) internal _userRedeemsByPToken;
+
   constructor(
     address _protocol,
     address _settings,
@@ -81,10 +83,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _currentEpochId.current();
   }
 
-  // function currentEpochInfo() public view returns (Constants.Epoch memory) {
-  //   return _epochs[_currentEpochId.current()];
-  // }
-
   function epochIdCount() public view returns (uint256) {
     return _allEpochIds.length();
   }
@@ -97,9 +95,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochs[epochId];
   }
 
-  // function yTokenByEpochId(uint256 epochId) public view returns (address) {
-  //   return _epochs[epochId].yToken;
-  // }
+  function userRedeemByPToken(address user) public view returns (Constants.RedeemByPToken memory) {
+    return _refreshRedeemByPToken(_userRedeemsByPToken[user]);
+  }
 
   function paramValue(bytes32 param) public view override returns (uint256) {
     return settings.vaultParamValue(address(this), param);
@@ -129,6 +127,45 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit YTokenMinted(address(this), amount, yTokenAmount);
   }
 
+  function updateUnlockedRedeemByPToken(uint256 pTokenAmount) external nonReentrant noneZeroAmount(pTokenAmount) validMsgValue(pTokenAmount) onUserAction {
+    Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
+    Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
+
+    uint256 pTokenSharesAmount = IPToken(_pToken).getSharesByBalance(pTokenAmount);
+    uint256 currentLockedPTokenSharesAmount = refreshedRedeem.lockedPTokenShares;
+
+    if (pTokenSharesAmount > currentLockedPTokenSharesAmount) {
+      // increase redeem amount
+      IPToken(_pToken).transferSharesFrom(_msgSender(), address(tokenPot), pTokenSharesAmount.sub(currentLockedPTokenSharesAmount));
+    }
+    else if (pTokenSharesAmount < currentLockedPTokenSharesAmount) {
+      // decrease redeem amount
+      tokenPot.withdrawPTokenShares(_msgSender(), _pToken, currentLockedPTokenSharesAmount.sub(pTokenSharesAmount));
+    }
+
+    Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+    refreshedRedeem.lockedPTokenShares = pTokenSharesAmount;
+    refreshedRedeem.unlockTime = currentEpoch.startTime.add(currentEpoch.duration);
+    _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+
+    emit UpdateRedeemByPToken(_msgSender(), pTokenAmount, pTokenSharesAmount);
+  }
+
+  function claimUnlockedRedeemByPToken() external nonReentrant onUserAction {
+    Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
+    Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
+
+    require(refreshedRedeem.claimablePTokenShares > 0, "No claimable pToken shares");
+    uint256 pTokenBurnAmount = IPToken(_pToken).burnShares(_msgSender(), refreshedRedeem.claimablePTokenShares);
+    uint256 assetAmount = pTokenBurnAmount;
+    tokenPot.withdraw(_msgSender(), _assetToken, assetAmount);
+
+    refreshedRedeem.claimablePTokenShares = 0;
+    _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+
+    emit ClaimUnlockedRedeemByPToken(_msgSender(), assetAmount, pTokenBurnAmount, refreshedRedeem.claimablePTokenShares);
+  }
+
   
   /* ========== RESTRICTED FUNCTIONS ========== */
 
@@ -156,6 +193,23 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     string memory yTokenSymbol = string(abi.encodePacked("y", assetTokenSymbol, epochIdStr));
     string memory yTokenName = string(abi.encodePacked("Zoo ", yTokenSymbol));
     return (yTokenName, yTokenSymbol);
+  }
+
+  function _refreshRedeemByPToken(Constants.RedeemByPToken memory redeemInfo) internal returns (Constants.RedeemByPToken memory) {
+    // no pTokens locked
+    if (redeemInfo.lockedPTokenShares == 0) {
+      return redeemInfo;
+    }
+    require(redeemInfo.unlockTime > 0, "Invalid unlock time");
+
+    // unlocked
+    if (redeemInfo.unlockTime <= block.timestamp) {
+      redeemInfo.claimablePTokenShares += redeemInfo.lockedPTokenShares;
+      redeemInfo.lockedPTokenShares = 0;
+      redeemInfo.unlockTime = 0;
+    }
+
+    return redeemInfo;
   }
 
 
@@ -209,5 +263,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenBurned(address indexed user, uint256 yTokenAmount);
+
+  event UpdateRedeemByPToken(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  event ClaimUnlockedRedeemByPToken(address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   
 }
