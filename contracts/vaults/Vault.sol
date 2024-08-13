@@ -5,45 +5,51 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
-import "../interfaces/IPToken.sol";
+import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IYToken.sol";
-import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
 import "./TokenPot.sol";
 
 contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
+  using Counters for Counters.Counter;
+  using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using SafeMath for uint256;
+  using Strings for uint256;
 
   IProtocolSettings public immutable settings;
   TokenPot public immutable tokenPot;
 
   address internal immutable _assetToken;
   address internal immutable _pToken;
-  address internal immutable _yToken;
+
+  Counters.Counter internal _currentEpochId;  // default to 0
+  DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
+  mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
   constructor(
     address _protocol,
     address _settings,
     address _assetToken_,
     address _pToken_,
-    address _yToken_
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _assetToken_ != address(0) && _pToken_ != address(0) && _yToken_ != address(0),
+      _settings != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
       "Zero address detected"
     );
 
     tokenPot = new TokenPot(_protocol, _settings);
     _assetToken = _assetToken_;
     _pToken = _pToken_;
-    _yToken = _yToken_;
 
     settings = IProtocolSettings(_settings);
   }
@@ -71,9 +77,29 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _pToken;
   }
 
-  function yToken() public view override returns (address) {
-    return _yToken;
+  function currentEpochId() public view returns (uint256) {
+    return _currentEpochId.current();
   }
+
+  // function currentEpochInfo() public view returns (Constants.Epoch memory) {
+  //   return _epochs[_currentEpochId.current()];
+  // }
+
+  function epochIdCount() public view returns (uint256) {
+    return _allEpochIds.length();
+  }
+
+  function epochIdAt(uint256 index) public view returns (uint256) {
+    return uint256(_allEpochIds.at(index));
+  }
+
+  function epochInfoById(uint256 epochId) public view returns (Constants.Epoch memory) {
+    return _epochs[epochId];
+  }
+
+  // function yTokenByEpochId(uint256 epochId) public view returns (address) {
+  //   return _epochs[epochId].yToken;
+  // }
 
   function paramValue(bytes32 param) public view override returns (uint256) {
     return settings.vaultParamValue(address(this), param);
@@ -82,15 +108,55 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function depoit(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
-    
+    if (_assetToken == Constants.NATIVE_TOKEN) {
+      TokensTransfer.transferTokens(_assetToken, address(this), address(tokenPot), amount);
+    }
+    else {
+      TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
+    }
+
+    // mint pToken to user
+    uint256 pTokenAmount = amount;
+    uint256 pTokenSharesAmount = IPToken(_usdToken).mint(_msgSender(), pTokenAmount);
+    emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
+
+    // mint yToken to Vault
+    Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+    uint256 currentEpochEndTime = currentEpoch.startTime.add(currentEpoch.duration);
+    require(block.timestamp < currentEpochEndTime, "Current epoch has ended");
+    uint256 yTokenAmount = amount * (currentEpochEndTime - block.timestamp) / currentEpoch.duration;
+    IYToken(currentEpoch.yToken).mint(address(this), yTokenAmount);
+    emit YTokenMinted(address(this), amount, yTokenAmount);
   }
 
   
-
   /* ========== RESTRICTED FUNCTIONS ========== */
 
 
+
   /* ========== INTERNAL FUNCTIONS ========== */
+
+  function _startNewEpoch() internal {
+    _currentEpochId.increment();
+
+    uint256 epochId = _currentEpochId.current();
+    _allEpochIds.pushBack(bytes32(epochId));
+
+    _epochs[epochId].epochId = epochId;
+    _epochs[epochId].startTime = block.timestamp;
+    _epochs[epochId].duration = settings.vaultParamValue(address(this), "EpochDuration");
+
+    (string memory yTokenName, string memory yTokenSymbol) = _generateYTokenNameAndSymbol(epochId);
+    _epochs[epochId].yToken = address(new YToken(yTokenName, yTokenSymbol));
+  }
+
+  function _generateYTokenNameAndSymbol(uint256 epochId) internal view returns (string memory, string memory) {
+    string memory assetTokenSymbol = IERC20Metadata(_assetToken).symbol();
+    string memory epochIdStr = epochId.toString();
+    string memory yTokenSymbol = string(abi.encodePacked("y", assetTokenSymbol, epochIdStr));
+    string memory yTokenName = string(abi.encodePacked("Zoo ", yTokenSymbol));
+    return (yTokenName, yTokenSymbol);
+  }
 
 
   /* ============== MODIFIERS =============== */
@@ -115,22 +181,33 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _;
   }
 
-  modifier onlyOwnerOrProtocol() {
-    require(_msgSender() == address(protocol) || _msgSender() == owner());
-    _;
-  }
+  // modifier onlyOwnerOrProtocol() {
+  //   require(_msgSender() == address(protocol) || _msgSender() == owner());
+  //   _;
+  // }
 
   modifier onUserAction() {
+    // Start first epoch
+    if (_currentEpochId.current() == 0) {
+      _startNewEpoch();
+    }
+    else {
+      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      if (block.timestamp > currentEpoch.startTime.add(currentEpoch.duration)) {
+        _startNewEpoch();
+      }
+    }
 
+    _;
   }
 
   /* =============== EVENTS ============= */
 
 
-  event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event YTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  event YTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
   
-  event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
-  event YTokenBurned(address indexed user, uint256 yTokenAmount, uint256 assetTokenPrice, uint256 assetTokenPriceDecimals);
+  event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  event YTokenBurned(address indexed user, uint256 yTokenAmount);
   
 }
