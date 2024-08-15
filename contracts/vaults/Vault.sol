@@ -50,17 +50,13 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
       _settings != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
       "Zero address detected"
     );
+    require(_assetToken_ != Constants.NATIVE_TOKEN, "Asset token cannot be NATIVE_TOKEN");
 
     tokenPot = new TokenPot(_protocol, _settings);
     _assetToken = _assetToken_;
     _pToken = _pToken_;
 
     settings = IProtocolSettings(_settings);
-  }
-
-  receive() external payable {
-    require(_assetToken == Constants.NATIVE_TOKEN);
-    TokensTransfer.transferTokens(_assetToken, address(this), address(tokenPot), msg.value);
   }
 
   /* ================= VIEWS ================ */
@@ -100,12 +96,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function depoit(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
-    if (_assetToken == Constants.NATIVE_TOKEN) {
-      TokensTransfer.transferTokens(_assetToken, address(this), address(tokenPot), amount);
-    }
-    else {
-      TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
-    }
+    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
 
     // mint pToken to user
     uint256 pTokenAmount = amount;
@@ -122,12 +113,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function swap(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
-    if (_assetToken == Constants.NATIVE_TOKEN) {
-      TokensTransfer.transferTokens(_assetToken, address(this), address(tokenPot), amount);
-    }
-    else {
-      TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
-    }
+    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
 
     uint256 pTokenAmount = amount;
     IPToken(_pToken).rebase(pTokenAmount);
@@ -138,45 +124,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit YTokenMinted(_msgSender(), amount, yTokenAmount);
 
   }
-
-  // function updateUnlockedRedeemByPToken(uint256 pTokenAmount) external nonReentrant noneZeroAmount(pTokenAmount) validMsgValue(pTokenAmount) onUserAction {
-  //   Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
-  //   Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
-
-  //   uint256 pTokenSharesAmount = IPToken(_pToken).getSharesByBalance(pTokenAmount);
-  //   uint256 currentLockedPTokenSharesAmount = refreshedRedeem.lockedPTokenShares;
-
-  //   if (pTokenSharesAmount > currentLockedPTokenSharesAmount) {
-  //     // increase redeem amount
-  //     IPToken(_pToken).transferSharesFrom(_msgSender(), address(tokenPot), pTokenSharesAmount.sub(currentLockedPTokenSharesAmount));
-  //   }
-  //   else if (pTokenSharesAmount < currentLockedPTokenSharesAmount) {
-  //     // decrease redeem amount
-  //     tokenPot.withdrawPTokenShares(_msgSender(), _pToken, currentLockedPTokenSharesAmount.sub(pTokenSharesAmount));
-  //   }
-
-  //   Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-  //   refreshedRedeem.lockedPTokenShares = pTokenSharesAmount;
-  //   refreshedRedeem.unlockTime = currentEpoch.startTime.add(currentEpoch.duration);
-  //   _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
-
-  //   emit UpdateRedeemByPToken(_msgSender(), pTokenAmount, pTokenSharesAmount);
-  // }
-
-  // function claimUnlockedRedeemByPToken() external nonReentrant onUserAction {
-  //   Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
-  //   Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
-
-  //   require(refreshedRedeem.claimablePTokenShares > 0, "No claimable pToken shares");
-  //   uint256 pTokenBurnAmount = IPToken(_pToken).burnShares(_msgSender(), refreshedRedeem.claimablePTokenShares);
-  //   uint256 assetAmount = pTokenBurnAmount;
-  //   tokenPot.withdraw(_msgSender(), _assetToken, assetAmount);
-
-  //   refreshedRedeem.claimablePTokenShares = 0;
-  //   _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
-
-  //   emit ClaimUnlockedRedeemByPToken(_msgSender(), assetAmount, pTokenBurnAmount, refreshedRedeem.claimablePTokenShares);
-  // }
 
   
   /* ========== RESTRICTED FUNCTIONS ========== */
@@ -272,7 +219,4 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenBurned(address indexed user, uint256 yTokenAmount);
 
-  // event UpdateRedeemByPToken(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  // event ClaimUnlockedRedeemByPToken(address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  
 }
