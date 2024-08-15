@@ -17,12 +17,13 @@ library Constants {
     uint256 startTime;
     uint256 duration;
     address yToken;
+    address redeemVault;
   }
 
-  struct RedeemByPToken {
-    address pToken;
-    uint256 claimablePTokenShares;
-    uint256 lockedPTokenShares;
-    uint256 unlockTime;
-  }
+  // struct RedeemByPToken {
+  //   address pToken;
+  //   uint256 claimablePTokenShares;
+  //   uint256 lockedPTokenShares;
+  //   uint256 unlockTime;
+  // }
 }

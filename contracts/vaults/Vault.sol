@@ -115,56 +115,74 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
     // mint pToken to user
     uint256 pTokenAmount = amount;
-    uint256 pTokenSharesAmount = IPToken(_usdToken).mint(_msgSender(), pTokenAmount);
+    uint256 pTokenSharesAmount = IPToken(_pToken).mint(_msgSender(), pTokenAmount);
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
     // mint yToken to Vault
     Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
     uint256 currentEpochEndTime = currentEpoch.startTime.add(currentEpoch.duration);
     require(block.timestamp < currentEpochEndTime, "Current epoch has ended");
-    uint256 yTokenAmount = amount * (currentEpochEndTime - block.timestamp) / currentEpoch.duration;
+    uint256 yTokenAmount = amount * (currentEpochEndTime - block.timestamp) / 3600;
     IYToken(currentEpoch.yToken).mint(address(this), yTokenAmount);
     emit YTokenMinted(address(this), amount, yTokenAmount);
   }
 
-  function updateUnlockedRedeemByPToken(uint256 pTokenAmount) external nonReentrant noneZeroAmount(pTokenAmount) validMsgValue(pTokenAmount) onUserAction {
-    Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
-    Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
-
-    uint256 pTokenSharesAmount = IPToken(_pToken).getSharesByBalance(pTokenAmount);
-    uint256 currentLockedPTokenSharesAmount = refreshedRedeem.lockedPTokenShares;
-
-    if (pTokenSharesAmount > currentLockedPTokenSharesAmount) {
-      // increase redeem amount
-      IPToken(_pToken).transferSharesFrom(_msgSender(), address(tokenPot), pTokenSharesAmount.sub(currentLockedPTokenSharesAmount));
+  function swap(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
+    if (_assetToken == Constants.NATIVE_TOKEN) {
+      TokensTransfer.transferTokens(_assetToken, address(this), address(tokenPot), amount);
     }
-    else if (pTokenSharesAmount < currentLockedPTokenSharesAmount) {
-      // decrease redeem amount
-      tokenPot.withdrawPTokenShares(_msgSender(), _pToken, currentLockedPTokenSharesAmount.sub(pTokenSharesAmount));
+    else {
+      TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
     }
+
+    uint256 pTokenAmount = amount;
+    IPToken(_pToken).rebase(pTokenAmount);
 
     Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-    refreshedRedeem.lockedPTokenShares = pTokenSharesAmount;
-    refreshedRedeem.unlockTime = currentEpoch.startTime.add(currentEpoch.duration);
-    _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+    uint256 yTokenAmount = amount * 3600; // testing only
+    IYToken(currentEpoch.yToken).mint(_msgSender(), yTokenAmount);
+    emit YTokenMinted(_msgSender(), amount, yTokenAmount);
 
-    emit UpdateRedeemByPToken(_msgSender(), pTokenAmount, pTokenSharesAmount);
   }
 
-  function claimUnlockedRedeemByPToken() external nonReentrant onUserAction {
-    Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
-    Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
+  // function updateUnlockedRedeemByPToken(uint256 pTokenAmount) external nonReentrant noneZeroAmount(pTokenAmount) validMsgValue(pTokenAmount) onUserAction {
+  //   Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
+  //   Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
 
-    require(refreshedRedeem.claimablePTokenShares > 0, "No claimable pToken shares");
-    uint256 pTokenBurnAmount = IPToken(_pToken).burnShares(_msgSender(), refreshedRedeem.claimablePTokenShares);
-    uint256 assetAmount = pTokenBurnAmount;
-    tokenPot.withdraw(_msgSender(), _assetToken, assetAmount);
+  //   uint256 pTokenSharesAmount = IPToken(_pToken).getSharesByBalance(pTokenAmount);
+  //   uint256 currentLockedPTokenSharesAmount = refreshedRedeem.lockedPTokenShares;
 
-    refreshedRedeem.claimablePTokenShares = 0;
-    _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+  //   if (pTokenSharesAmount > currentLockedPTokenSharesAmount) {
+  //     // increase redeem amount
+  //     IPToken(_pToken).transferSharesFrom(_msgSender(), address(tokenPot), pTokenSharesAmount.sub(currentLockedPTokenSharesAmount));
+  //   }
+  //   else if (pTokenSharesAmount < currentLockedPTokenSharesAmount) {
+  //     // decrease redeem amount
+  //     tokenPot.withdrawPTokenShares(_msgSender(), _pToken, currentLockedPTokenSharesAmount.sub(pTokenSharesAmount));
+  //   }
 
-    emit ClaimUnlockedRedeemByPToken(_msgSender(), assetAmount, pTokenBurnAmount, refreshedRedeem.claimablePTokenShares);
-  }
+  //   Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+  //   refreshedRedeem.lockedPTokenShares = pTokenSharesAmount;
+  //   refreshedRedeem.unlockTime = currentEpoch.startTime.add(currentEpoch.duration);
+  //   _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+
+  //   emit UpdateRedeemByPToken(_msgSender(), pTokenAmount, pTokenSharesAmount);
+  // }
+
+  // function claimUnlockedRedeemByPToken() external nonReentrant onUserAction {
+  //   Constants.RedeemByPToken memory redeem = _userRedeemsByPToken[_msgSender()];
+  //   Constants.RedeemByPToken memory refreshedRedeem = _refreshRedeemByPToken(redeem);
+
+  //   require(refreshedRedeem.claimablePTokenShares > 0, "No claimable pToken shares");
+  //   uint256 pTokenBurnAmount = IPToken(_pToken).burnShares(_msgSender(), refreshedRedeem.claimablePTokenShares);
+  //   uint256 assetAmount = pTokenBurnAmount;
+  //   tokenPot.withdraw(_msgSender(), _assetToken, assetAmount);
+
+  //   refreshedRedeem.claimablePTokenShares = 0;
+  //   _userRedeemsByPToken[_msgSender()] = refreshedRedeem;
+
+  //   emit ClaimUnlockedRedeemByPToken(_msgSender(), assetAmount, pTokenBurnAmount, refreshedRedeem.claimablePTokenShares);
+  // }
 
   
   /* ========== RESTRICTED FUNCTIONS ========== */
@@ -195,22 +213,22 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return (yTokenName, yTokenSymbol);
   }
 
-  function _refreshRedeemByPToken(Constants.RedeemByPToken memory redeemInfo) internal returns (Constants.RedeemByPToken memory) {
-    // no pTokens locked
-    if (redeemInfo.lockedPTokenShares == 0) {
-      return redeemInfo;
-    }
-    require(redeemInfo.unlockTime > 0, "Invalid unlock time");
+  // function _refreshRedeemByPToken(Constants.RedeemByPToken memory redeemInfo) internal returns (Constants.RedeemByPToken memory) {
+  //   // no pTokens locked
+  //   if (redeemInfo.lockedPTokenShares == 0) {
+  //     return redeemInfo;
+  //   }
+  //   require(redeemInfo.unlockTime > 0, "Invalid unlock time");
 
-    // unlocked
-    if (redeemInfo.unlockTime <= block.timestamp) {
-      redeemInfo.claimablePTokenShares += redeemInfo.lockedPTokenShares;
-      redeemInfo.lockedPTokenShares = 0;
-      redeemInfo.unlockTime = 0;
-    }
+  //   // unlocked
+  //   if (redeemInfo.unlockTime <= block.timestamp) {
+  //     redeemInfo.claimablePTokenShares += redeemInfo.lockedPTokenShares;
+  //     redeemInfo.lockedPTokenShares = 0;
+  //     redeemInfo.unlockTime = 0;
+  //   }
 
-    return redeemInfo;
-  }
+  //   return redeemInfo;
+  // }
 
 
   /* ============== MODIFIERS =============== */
@@ -264,7 +282,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenBurned(address indexed user, uint256 yTokenAmount);
 
-  event UpdateRedeemByPToken(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  event ClaimUnlockedRedeemByPToken(address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  // event UpdateRedeemByPToken(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  // event ClaimUnlockedRedeemByPToken(address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   
 }

@@ -10,8 +10,6 @@ interface IPToken is IERC20 {
 
   function burn(address account, uint256 amount) external returns (uint256);
 
-  function burnShares(address account, uint256 sharesAmount) external returns (uint256);
-
   function getBalanceByShares(uint256 sharesAmount) external view returns (uint256);
 
   function getSharesByBalance(uint256 balance) external view returns (uint256);
