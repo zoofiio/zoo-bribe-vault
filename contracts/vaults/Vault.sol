@@ -18,7 +18,9 @@ import "../interfaces/IYToken.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
+import "../tokens/YToken.sol";
 import "./TokenPot.sol";
+import "./RedeemPool.sol";
 
 contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   using Counters for Counters.Counter;
@@ -36,13 +38,13 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
-  mapping(address => Constants.RedeemByPToken) internal _userRedeemsByPToken;
+  // mapping(address => Constants.RedeemByPToken) internal _userRedeemsByPToken;
 
   constructor(
     address _protocol,
     address _settings,
     address _assetToken_,
-    address _pToken_,
+    address _pToken_
   ) ProtocolOwner(_protocol) {
     require(
       _settings != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
@@ -71,10 +73,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _assetToken;
   }
 
-  function assetTokenDecimals() public view override returns (uint8) {
-    return this.vaultAssetTokenDecimals();
-  }
-
   function pToken() public view override returns (address) {
     return _pToken;
   }
@@ -93,10 +91,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   function epochInfoById(uint256 epochId) public view returns (Constants.Epoch memory) {
     return _epochs[epochId];
-  }
-
-  function userRedeemByPToken(address user) public view returns (Constants.RedeemByPToken memory) {
-    return _refreshRedeemByPToken(_userRedeemsByPToken[user]);
   }
 
   function paramValue(bytes32 param) public view override returns (uint256) {
@@ -191,6 +185,20 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
+  function _onEndEpoch(uint256 epochId) internal {
+    Constants.Epoch memory epoch = _epochs[epochId];
+
+    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+
+    uint256 totalRedeemingPTokens = redeemPool.totalRedeemingBalance();
+    IPToken(_pToken).burn(address(redeemPool), totalRedeemingPTokens);
+
+    uint256 assetAmount = totalRedeemingPTokens;
+    tokenPot.withdraw(address(redeemPool), _assetToken, assetAmount);
+
+    redeemPool.notifySettlement(assetAmount);
+  }
+
   function _startNewEpoch() internal {
     _currentEpochId.increment();
 
@@ -203,6 +211,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
     (string memory yTokenName, string memory yTokenSymbol) = _generateYTokenNameAndSymbol(epochId);
     _epochs[epochId].yToken = address(new YToken(yTokenName, yTokenSymbol));
+    _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
   }
 
   function _generateYTokenNameAndSymbol(uint256 epochId) internal view returns (string memory, string memory) {
@@ -213,22 +222,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return (yTokenName, yTokenSymbol);
   }
 
-  // function _refreshRedeemByPToken(Constants.RedeemByPToken memory redeemInfo) internal returns (Constants.RedeemByPToken memory) {
-  //   // no pTokens locked
-  //   if (redeemInfo.lockedPTokenShares == 0) {
-  //     return redeemInfo;
-  //   }
-  //   require(redeemInfo.unlockTime > 0, "Invalid unlock time");
-
-  //   // unlocked
-  //   if (redeemInfo.unlockTime <= block.timestamp) {
-  //     redeemInfo.claimablePTokenShares += redeemInfo.lockedPTokenShares;
-  //     redeemInfo.lockedPTokenShares = 0;
-  //     redeemInfo.unlockTime = 0;
-  //   }
-
-  //   return redeemInfo;
-  // }
 
 
   /* ============== MODIFIERS =============== */
@@ -253,10 +246,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _;
   }
 
-  // modifier onlyOwnerOrProtocol() {
-  //   require(_msgSender() == address(protocol) || _msgSender() == owner());
-  //   _;
-  // }
 
   modifier onUserAction() {
     // Start first epoch
@@ -266,6 +255,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     else {
       Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
       if (block.timestamp > currentEpoch.startTime.add(currentEpoch.duration)) {
+        _onEndEpoch(_currentEpochId.current());
         _startNewEpoch();
       }
     }

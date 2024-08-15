@@ -49,10 +49,6 @@ contract MockVault is IVault {
   function assetToken() external view override returns (address) {
     return _assetToken;
   }
-
-  function assetTokenDecimals() public pure returns (uint8) {
-    return 18;
-  }
   
   function assetBalance() external pure returns (uint256) {
     return 0;
