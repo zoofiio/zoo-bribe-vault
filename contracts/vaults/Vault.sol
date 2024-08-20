@@ -18,6 +18,7 @@ import "../interfaces/IStakingPool.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
+import "../tokens/PToken.sol";
 import "./RedeemPool.sol";
 
 contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
@@ -44,10 +45,10 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     address _settings,
     address _stakingPool_,
     address _assetToken_,
-    address _pToken_
+    string memory _pTokenName, string memory _pTokensymbol
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
+      _settings != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN, "Asset token cannot be NATIVE_TOKEN");
@@ -56,7 +57,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
-    _pToken = IPToken(_pToken_);
+    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol);
     
     _assetToken.approve(address(stakingPool), type(uint256).max);
   }

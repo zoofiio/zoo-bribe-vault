@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "./interfaces/IUsd.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/IZooProtocol.sol";
 import "./settings/ProtocolSettings.sol";
@@ -16,8 +15,6 @@ contract ZooProtocol is IZooProtocol, Ownable, ReentrancyGuard {
   EnumerableSet.AddressSet internal _assetTokens;
   EnumerableSet.AddressSet internal _vaults;
   mapping(address => EnumerableSet.AddressSet) _assetTokenToVaults;
-
-  bool public initialized;
 
   constructor() {}
 

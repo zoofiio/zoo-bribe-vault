@@ -16,8 +16,8 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   uint256 constant internal INFINITE_ALLOWANCE = type(uint256).max;
 
   IProtocolSettings public immutable settings;
+  address public immutable vault;
 
-  address public vault;
   string internal _name_;
   string internal _symbol_;
 
@@ -28,21 +28,22 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   mapping (address => mapping (address => uint256)) private _allowances;
 
-  constructor(address _protocol, address _settings, string memory _name, string memory _symbol) ProtocolOwner(_protocol) ERC20(_name, _symbol) {
+  constructor(address _protocol, address _settings, string memory _name, string memory _symbol) ProtocolOwner(_protocol) {
     require(_protocol != address(0) && _settings != address(0), "Zero address detected");
 
     settings = IProtocolSettings(_settings);
+    vault = _msgSender();
     _name_ = _name;
     _symbol_ = _symbol;
   }
 
   /* ================= IERC20Metadata ================ */
 
-  function name() public view virtual override returns (string memory) {
+  function name() public view virtual returns (string memory) {
     return _name_;
   }
 
-  function symbol() public view virtual override returns (string memory) {
+  function symbol() public view virtual returns (string memory) {
     return _symbol_;
   }
 
@@ -129,14 +130,6 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   function setSymbol(string memory _symbol) external nonReentrant onlyOwner {
     _symbol_ = _symbol;
-  }
-
-  function setVault(address _vault) external nonReentrant onlyOwner {
-    require(vault == address(0), "Vault already set");
-    require(_vault != address(0), "Zero address detected");
-
-    vault = _vault;
-    emit SetVault(vault);
   }
 
   /* ================= IPToken Functions ================ */
@@ -252,7 +245,6 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   /* ============== MODIFIERS =============== */
 
   modifier onlyVault() {
-    require(vault != address(0), "Vault not set");
     require(vault == _msgSender(), "Caller is not Vault");
     _;
   }
@@ -261,5 +253,4 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   event TransferShares(address indexed from, address indexed to, uint256 sharesValue);
   event Rebased(uint256 addedSupply);
-  event SetVault(address indexed vault);
 }
