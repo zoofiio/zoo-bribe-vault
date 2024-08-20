@@ -14,12 +14,10 @@ import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
-import "../interfaces/IYToken.sol";
+import "../interfaces/IStakingPool.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
-import "../tokens/YToken.sol";
-import "./TokenPot.sol";
 import "./RedeemPool.sol";
 
 contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
@@ -29,48 +27,52 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   using Strings for uint256;
 
   IProtocolSettings public immutable settings;
-  TokenPot public immutable tokenPot;
+  IStakingPool public immutable stakingPool;
 
-  address internal immutable _assetToken;
-  address internal immutable _pToken;
+  IERC20 internal immutable _assetToken;
+  IPToken internal immutable _pToken;
 
   Counters.Counter internal _currentEpochId;  // default to 0
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
-  // mapping(address => Constants.RedeemByPToken) internal _userRedeemsByPToken;
+  mapping(uint256 => uint256) _yTokenTotalSupply;
+  mapping(uint256 => mapping(address => uint256)) _yTokenUserBalances;
 
   constructor(
     address _protocol,
     address _settings,
+    address _stakingPool_,
     address _assetToken_,
     address _pToken_
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
+      _settings != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0) && _pToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN, "Asset token cannot be NATIVE_TOKEN");
 
-    tokenPot = new TokenPot(_protocol, _settings);
-    _assetToken = _assetToken_;
-    _pToken = _pToken_;
-
     settings = IProtocolSettings(_settings);
+    stakingPool = IStakingPool(_stakingPool_);
+
+    _assetToken = IERC20(_assetToken_);
+    _pToken = IPToken(_pToken_);
+    
+    _assetToken.approve(address(stakingPool), type(uint256).max);
   }
 
   /* ================= VIEWS ================ */
 
   function assetBalance() public view override returns (uint256) {
-    return tokenPot.balance(_assetToken);
+    return stakingPool.balanceOf(address(this));
   }
 
   function assetToken() public view override returns (address) {
-    return _assetToken;
+    return address(_assetToken);
   }
 
   function pToken() public view override returns (address) {
-    return _pToken;
+    return address(_pToken);
   }
 
   function currentEpochId() public view returns (uint256) {
@@ -89,6 +91,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochs[epochId];
   }
 
+  function yTokenTotalSupply(uint256 epochId) public view validEpochId(epochId) returns (uint256) {
+    return _yTokenTotalSupply[epochId];
+  }
+
+  function yTokenUserBalance(uint256 epochId, address user) public view validEpochId(epochId) returns (uint256) {
+    return _yTokenUserBalances[epochId][user];
+  }
+
   function paramValue(bytes32 param) public view override returns (uint256) {
     return settings.vaultParamValue(address(this), param);
   }
@@ -96,7 +106,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function depoit(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
-    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
+    TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
+    stakingPool.stake(amount);
 
     // mint pToken to user
     uint256 pTokenAmount = amount;
@@ -107,21 +118,48 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
     uint256 currentEpochEndTime = currentEpoch.startTime.add(currentEpoch.duration);
     require(block.timestamp < currentEpochEndTime, "Current epoch has ended");
+
     uint256 yTokenAmount = amount * (currentEpochEndTime - block.timestamp) / 3600;
-    IYToken(currentEpoch.yToken).mint(address(this), yTokenAmount);
-    emit YTokenMinted(address(this), amount, yTokenAmount);
+    _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
+    _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].add(yTokenAmount);
+    emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
   }
 
   function swap(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
-    TokensTransfer.transferTokens(_assetToken, _msgSender(), address(tokenPot), amount);
+    TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
+    stakingPool.stake(amount);
 
     uint256 pTokenAmount = amount;
     IPToken(_pToken).rebase(pTokenAmount);
 
-    Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
     uint256 yTokenAmount = amount * 3600; // testing only
-    IYToken(currentEpoch.yToken).mint(_msgSender(), yTokenAmount);
-    emit YTokenMinted(_msgSender(), amount, yTokenAmount);
+    _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
+    _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
+    emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);
+  }
+
+  function claimBribes(uint256 epochId) external nonReentrant validEpochId(epochId) onUserAction {
+    uint256 yTokenBalance = _yTokenUserBalances[epochId][_msgSender()];
+    require(yTokenBalance > 0, "No yToken balance");
+    uint256 yTokenTotal= _yTokenTotalSupply[epochId];
+    require(yTokenTotal >= yTokenBalance, "Invalid yToken balance");
+
+    _yTokenUserBalances[epochId][_msgSender()] = 0;
+    _yTokenTotalSupply[epochId] = yTokenTotal.sub(yTokenBalance);
+    emit YTokenDummyBurned(epochId, _msgSender(), yTokenBalance);
+
+    stakingPool.getReward();
+
+    address[] memory rewardTokens = stakingPool.rewardTokens();
+    for (uint i; i < rewardTokens.length; i++) {
+      address rewardToken = rewardTokens[i];
+      uint256 totalRewards = IERC20(rewardToken).balanceOf(address(this));
+      uint256 reward = totalRewards.mul(yTokenBalance).div(yTokenTotal);
+      if (reward > 0) {
+        TokensTransfer.transferTokens(rewardToken, address(this), _msgSender(), reward);
+        emit BribePaid(rewardToken, _msgSender(), reward);
+      }
+    }
 
   }
 
@@ -141,7 +179,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     IPToken(_pToken).burn(address(redeemPool), totalRedeemingPTokens);
 
     uint256 assetAmount = totalRedeemingPTokens;
-    tokenPot.withdraw(address(redeemPool), _assetToken, assetAmount);
+    stakingPool.withdraw(assetAmount);
+    TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), assetAmount);
 
     redeemPool.notifySettlement(assetAmount);
   }
@@ -155,21 +194,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _epochs[epochId].epochId = epochId;
     _epochs[epochId].startTime = block.timestamp;
     _epochs[epochId].duration = settings.vaultParamValue(address(this), "EpochDuration");
-
-    (string memory yTokenName, string memory yTokenSymbol) = _generateYTokenNameAndSymbol(epochId);
-    _epochs[epochId].yToken = address(new YToken(yTokenName, yTokenSymbol));
     _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
   }
-
-  function _generateYTokenNameAndSymbol(uint256 epochId) internal view returns (string memory, string memory) {
-    string memory assetTokenSymbol = IERC20Metadata(_assetToken).symbol();
-    string memory epochIdStr = epochId.toString();
-    string memory yTokenSymbol = string(abi.encodePacked("y", assetTokenSymbol, epochIdStr));
-    string memory yTokenName = string(abi.encodePacked("Zoo ", yTokenSymbol));
-    return (yTokenName, yTokenSymbol);
-  }
-
-
 
   /* ============== MODIFIERS =============== */
 
@@ -179,7 +205,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   modifier validMsgValue(uint256 value) {
-    if (_assetToken == Constants.NATIVE_TOKEN) {
+    if (address(_assetToken) == Constants.NATIVE_TOKEN) {
       require(msg.value == value, "Invalid msg value");
     }
     else {
@@ -193,6 +219,13 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _;
   }
 
+  modifier validEpochId(uint256 epochId) {
+    require(
+      epochId > 0 && epochId <= _currentEpochId.current() && _epochs[epochId].startTime > 0,
+      "Invalid epoch id"
+    );
+    _;
+  }
 
   modifier onUserAction() {
     // Start first epoch
@@ -214,9 +247,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
 
   event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  event YTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
+  event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
   
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  event YTokenBurned(address indexed user, uint256 yTokenAmount);
+  event YTokenDummyBurned(uint256 indexed epochId, address indexed user, uint256 yTokenAmount);
+
+  event BribePaid(address indexed bribeToken, address indexed user, uint256 amount);
 
 }

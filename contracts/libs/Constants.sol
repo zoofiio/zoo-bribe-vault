@@ -13,7 +13,6 @@ library Constants {
     uint256 epochId;
     uint256 startTime;
     uint256 duration;
-    address yToken;
     address redeemPool;
   }
 }

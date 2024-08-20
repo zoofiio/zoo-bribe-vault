@@ -49,7 +49,7 @@ library TokensTransfer {
   ) internal {
     require(from != to, "Same address");
     require(from != address(0) && to != address(0), "Zero address");
-    // require(from == address(this) || to == address(this), "One of the addresses must be this contract");
+    require(from == address(this) || to == address(this), "One of the addresses must be this contract");
     require(amount > 0, "Amount must be greater than 0");
 
     if (from == address(this)) {
