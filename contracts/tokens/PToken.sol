@@ -244,7 +244,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   /* ============== MODIFIERS =============== */
 
-  modifier onlyVault() {
+  modifier onlyVault() virtual {
     require(vault == _msgSender(), "Caller is not Vault");
     _;
   }

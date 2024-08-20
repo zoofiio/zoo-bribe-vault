@@ -2,16 +2,13 @@ import _ from 'lodash';
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { deployBaseContractsFixture } from './utils';
+import { deployContractsFixture } from './utils';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 
 describe('stETH', () => {
 
   it('stETH works', async () => {
-    const { protocol, usd, stETH, Alice, Bob, Caro } = await loadFixture(deployBaseContractsFixture);
-
-    let trans = await protocol.connect(Alice).initialize(await usd.getAddress());
-    await trans.wait();
+    const { protocol, stETH, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
 
     // Alice mint 100 $stETH to Bob
     let mintAmount = ethers.parseUnits('100', await stETH.decimals());

@@ -1,17 +1,13 @@
 import _ from 'lodash';
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { FactoryOptions } from "@nomicfoundation/hardhat-ethers/types";
 import {
   MockERC20__factory,
-  ERC20__factory,
   ProtocolSettings__factory,
   MockRebasableERC20__factory,
   ZooProtocol__factory,
-  Vault,
-  ZooProtocol,
-  ProtocolSettings,
   Vault__factory,
+  MockStakingPool__factory,
 } from "../typechain";
 
 const { provider } = ethers;
@@ -45,26 +41,21 @@ export async function deployContractsFixture() {
   const MockRebasableERC20 = await MockRebasableERC20Factory.deploy("Liquid staked Ether 2.0", "stETH");
   const stETH = MockRebasableERC20__factory.connect(await MockRebasableERC20.getAddress(), provider);
 
+  const MockStakingPoolFactory = await ethers.getContractFactory("MockStakingPool");
+  const MockStakingPool = await MockStakingPoolFactory.deploy(await protocol.owner(), await iBGT.getAddress());
+  const stakingPool = MockStakingPool__factory.connect(await MockStakingPool.getAddress(), provider);
 
+  const VaultFactory = await ethers.getContractFactory("Vault");
+  const iBGTVaultContract = await VaultFactory.deploy(
+    await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
+    await iBGT.getAddress(), "Zoo piBGT", "piBGT"
+  );
+  const iBGTVault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
 
-  let res = await deployVault(protocol, settings, ethPriceFeed, "Vault", "PtyPoolBuyLow", "PtyPoolSellHigh", nativeTokenAddress, "Zoo Leveraged ETH", "ETHx", {
-    libraries: {
-      VaultCalculator: await vaultCalculator.getAddress(),
-    }
-  });
-  const ethx = res.marginToken, ethVault = res.vault;
-  
-
-  return {
-    Alice,
-    Bob,
-    Caro,
-    protocol,
-    settings,
-    iBGT,
-    stETH,
-    ethVault,
-    ethx,
+  return { 
+    Alice, Bob, Caro, Dave,
+    protocol, settings, stakingPool,
+    iBGT, stETH, iBGTVault
   };
 }
 
