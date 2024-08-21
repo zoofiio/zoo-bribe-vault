@@ -176,14 +176,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
     RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
 
-    uint256 totalRedeemingPTokens = redeemPool.totalRedeemingBalance();
-    IPToken(_pToken).burn(address(redeemPool), totalRedeemingPTokens);
+    uint256 amount = redeemPool.totalRedeemingBalance();
+    if (amount > 0) {
+      IPToken(_pToken).burn(address(redeemPool), amount);
+      stakingPool.withdraw(amount);
+      TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), amount);
+    }
 
-    uint256 assetAmount = totalRedeemingPTokens;
-    stakingPool.withdraw(assetAmount);
-    TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), assetAmount);
-
-    redeemPool.notifySettlement(assetAmount);
+    redeemPool.notifySettlement(amount);
   }
 
   function _startNewEpoch() internal {

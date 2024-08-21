@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -59,12 +59,16 @@ contract RedeemPool is Context, ReentrancyGuard {
     return _assetToken;
   }
 
+  function settled() public view returns (bool) {
+    return _settled;
+  }
+
   function totalRedeemingShares() public view returns (uint256) {
     return _totalRedeemingShares;
   }
 
   // $piBGT
-  function totalRedeemingBalance() public view returns (uint256) {
+  function totalRedeemingBalance() public view onlyBeforeSettlement returns (uint256) {
     return IERC20(_redeemingPToken).balanceOf(address(this));
   }
 
@@ -73,7 +77,7 @@ contract RedeemPool is Context, ReentrancyGuard {
   }
 
   // $piBGT
-  function userRedeemingBalance(address account) public view returns (uint256) {
+  function userRedeemingBalance(address account) public view onlyBeforeSettlement returns (uint256) {
     return getRedeemingBalanceByShares(_userRedeemingShares[account]);
   }
 
@@ -82,7 +86,7 @@ contract RedeemPool is Context, ReentrancyGuard {
     return _userRedeemingShares[account].mul(_assetAmountPerRedeemingShare.sub(_userAssetAmountPerRedeemingSharePaid[account])).div(1e18).add(_userAssetAmounts[account]);
   }
 
-  function getRedeemingSharesByBalance(uint256 stakingBalance) public view returns (uint256) {
+  function getRedeemingSharesByBalance(uint256 stakingBalance) public view onlyBeforeSettlement returns (uint256) {
     if (totalRedeemingBalance() == 0 || _totalRedeemingShares == 0) return stakingBalance;
 
     return stakingBalance
@@ -90,7 +94,7 @@ contract RedeemPool is Context, ReentrancyGuard {
       .div(totalRedeemingBalance());
   }
 
-  function getRedeemingBalanceByShares(uint256 stakingShares) public view returns (uint256) {
+  function getRedeemingBalanceByShares(uint256 stakingShares) public view onlyBeforeSettlement returns (uint256) {
     if (_totalRedeemingShares == 0) return 0;
   
     return stakingShares
@@ -100,8 +104,9 @@ contract RedeemPool is Context, ReentrancyGuard {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function redeem(uint256 amount) external payable nonReentrant onlyUnsettled updateAssetAmount(_msgSender()) {
-    require(amount > 0, "Cannot stake 0");
+  function redeem(uint256 amount) external payable nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
+    // console.log('#redeem, amount: %s, msg.value: %s', amount, msg.value);
+    require(amount > 0, "Cannot redeem 0");
     require(msg.value == 0, "msg.value should be 0");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
@@ -112,9 +117,9 @@ contract RedeemPool is Context, ReentrancyGuard {
     emit Redeem(_msgSender(), amount);
   }
 
-  function withdrawRedeem(uint256 amount) public nonReentrant onlyUnsettled updateAssetAmount(_msgSender()) {
+  function withdrawRedeem(uint256 amount) public nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     require(amount > 0, "Cannot withdraw 0");
-    require(amount <= userRedeemingBalance(_msgSender()), "Insufficient balance");
+    require(amount <= userRedeemingBalance(_msgSender()), "Insufficient redeeming balance");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
     _totalRedeemingShares = _totalRedeemingShares.sub(sharesAmount);
@@ -125,25 +130,27 @@ contract RedeemPool is Context, ReentrancyGuard {
   }
 
   // $iBGT
-  function claimAssetToken() public nonReentrant updateAssetAmount(_msgSender()) {
+  function claimAssetToken() public nonReentrant onlyAfterSettlement updateAssetAmount(_msgSender()) {
     uint256 amount = _userAssetAmounts[_msgSender()];
     if (amount > 0) {
       _userAssetAmounts[_msgSender()] = 0;
-      IERC20(_assetToken).transfer(_msgSender(), amount);
-      emit AssetTokenPaid(_msgSender(), amount);
+      TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), amount);
+      emit AssetTokenClaimed(_msgSender(), amount);
     }
   }
 
   function exit() external {
     if (!_settled) {
       withdrawRedeem(userRedeemingBalance(_msgSender()));
-    } 
-    claimAssetToken();
+    }
+    else {
+      claimAssetToken();
+    }
   }
 
   /* ========== RESTRICTED FUNCTIONS ========== */
 
-  function notifySettlement(uint256 assetAmount) external nonReentrant onlyUnsettled onlyVault {
+  function notifySettlement(uint256 assetAmount) external nonReentrant onlyBeforeSettlement onlyVault {
     _settled = true;
     _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(assetAmount.mul(1e18).div(_totalRedeemingShares));
     emit Settlement(assetAmount);
@@ -151,8 +158,13 @@ contract RedeemPool is Context, ReentrancyGuard {
 
   /* ========== MODIFIERS ========== */
 
-  modifier onlyUnsettled() {
-    require(!_settled, "Settled");
+  modifier onlyBeforeSettlement() {
+    require(!_settled, "Already settled");
+    _;
+  }
+
+  modifier onlyAfterSettlement() {
+    require(_settled, "Not settled");
     _;
   }
 
@@ -174,6 +186,6 @@ contract RedeemPool is Context, ReentrancyGuard {
   event Redeem(address indexed user, uint256 amount);
   event WithdrawRedeem(address indexed user, uint256 amount);
 
-  event AssetTokenPaid(address indexed user, uint256 amount);
+  event AssetTokenClaimed(address indexed user, uint256 amount);
   event Settlement(uint256 assetAmount);
 }
