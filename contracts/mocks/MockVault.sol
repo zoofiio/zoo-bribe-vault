@@ -52,7 +52,14 @@ contract MockVault is IVault {
 
   /* ========== Mock Functions ========== */
 
-  function mockDepoit(uint256 amount) external payable {
+  function mockSwap(uint256 amount) external {
+    TokensTransfer.transferTokens(address(_assetToken), msg.sender, address(this), amount);
+    // stakingPool.stake(amount);
+
+    IPToken(_pToken).rebase(amount);
+  }
+
+  function mockDepoit(uint256 amount) external {
     TokensTransfer.transferTokens(address(_assetToken), msg.sender, address(this), amount);
     // stakingPool.stake(amount);
 

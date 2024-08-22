@@ -63,17 +63,9 @@ contract RedeemPool is Context, ReentrancyGuard {
     return _settled;
   }
 
-  function totalRedeemingShares() public view returns (uint256) {
-    return _totalRedeemingShares;
-  }
-
   // $piBGT
   function totalRedeemingBalance() public view onlyBeforeSettlement returns (uint256) {
     return IERC20(_redeemingPToken).balanceOf(address(this));
-  }
-
-  function userRedeemingShares(address account) public view returns (uint256) {
-    return _userRedeemingShares[account];
   }
 
   // $piBGT
@@ -104,10 +96,10 @@ contract RedeemPool is Context, ReentrancyGuard {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function redeem(uint256 amount) external payable nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
+  function redeem(uint256 amount) external nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     // console.log('#redeem, amount: %s, msg.value: %s', amount, msg.value);
     require(amount > 0, "Cannot redeem 0");
-    require(msg.value == 0, "msg.value should be 0");
+    // require(msg.value == 0, "msg.value should be 0");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
     _totalRedeemingShares = _totalRedeemingShares.add(sharesAmount);
@@ -152,7 +144,10 @@ contract RedeemPool is Context, ReentrancyGuard {
 
   function notifySettlement(uint256 assetAmount) external nonReentrant onlyBeforeSettlement onlyVault {
     _settled = true;
-    _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(assetAmount.mul(1e18).div(_totalRedeemingShares));
+    if (assetAmount > 0) {
+      require(_totalRedeemingShares > 0, "No redeems");
+      _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(assetAmount.mul(1e18).div(_totalRedeemingShares));
+    }
     emit Settlement(assetAmount);
   }
 

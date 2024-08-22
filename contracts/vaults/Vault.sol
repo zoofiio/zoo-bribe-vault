@@ -106,7 +106,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function depoit(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
+  function depoit(uint256 amount) external nonReentrant noneZeroAmount(amount) onUserAction {
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -126,7 +126,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
   }
 
-  function swap(uint256 amount) external payable nonReentrant noneZeroAmount(amount) validMsgValue(amount) onUserAction {
+  function swap(uint256 amount) external nonReentrant noneZeroAmount(amount) onUserAction {
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -202,16 +202,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   modifier noneZeroAmount(uint256 amount) {
     require(amount > 0, "Amount must be greater than 0");
-    _;
-  }
-
-  modifier validMsgValue(uint256 value) {
-    if (address(_assetToken) == Constants.NATIVE_TOKEN) {
-      require(msg.value == value, "Invalid msg value");
-    }
-    else {
-      require(msg.value == 0, "msg.value should be 0");
-    }
     _;
   }
 
