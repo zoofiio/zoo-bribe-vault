@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IStakingPool.sol";
@@ -28,7 +30,7 @@ contract MockVault is IVault {
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
-    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol);
+    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, IERC20Metadata(_assetToken_).decimals());
   }
 
   /* ========== IVault Functions ========== */

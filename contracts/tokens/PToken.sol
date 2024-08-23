@@ -20,6 +20,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   string internal _name_;
   string internal _symbol_;
+  uint8 internal _decimals_;
 
   uint256 private _totalSupply;
 
@@ -28,13 +29,14 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   mapping (address => mapping (address => uint256)) private _allowances;
 
-  constructor(address _protocol, address _settings, string memory _name, string memory _symbol) ProtocolOwner(_protocol) {
+  constructor(address _protocol, address _settings, string memory _name, string memory _symbol, uint8 _decimals) ProtocolOwner(_protocol) {
     require(_protocol != address(0) && _settings != address(0), "Zero address detected");
 
     settings = IProtocolSettings(_settings);
     vault = _msgSender();
     _name_ = _name;
     _symbol_ = _symbol;
+    _decimals_ = _decimals;
   }
 
   /* ================= IERC20Metadata ================ */
@@ -47,8 +49,8 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return _symbol_;
   }
 
-  function decimals() public pure returns (uint8) {
-    return 18;
+  function decimals() public view returns (uint8) {
+    return _decimals_;
   }
 
   /* ================= IERC20 Views ================ */

@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { deployContractsFixture } from './utils';
 import { 
-  MockVault, RedeemPool, PToken, MockERC20,
+  MockVault, RedeemPool, PToken,
   MockVault__factory, RedeemPool__factory, PToken__factory,
   MockERC20__factory
 } from "../typechain";

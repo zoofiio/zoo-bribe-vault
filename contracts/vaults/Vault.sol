@@ -61,7 +61,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
-    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol);
+    // PToken's decimals should be the same as the asset token's decimals
+    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, IERC20Metadata(_assetToken_).decimals());
     
     _assetToken.approve(address(stakingPool), type(uint256).max);
 
@@ -89,6 +90,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function currentEpochId() public view returns (uint256) {
+    require(_currentEpochId.current() > 0, "No epochs yet");
     return _currentEpochId.current();
   }
 
@@ -100,7 +102,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return uint256(_allEpochIds.at(index));
   }
 
-  function epochInfoById(uint256 epochId) public view returns (Constants.Epoch memory) {
+  function epochInfoById(uint256 epochId) public view validEpochId(epochId) returns (Constants.Epoch memory) {
     return _epochs[epochId];
   }
 
@@ -118,7 +120,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function depoit(uint256 amount) external nonReentrant whenDepositNotPaused noneZeroAmount(amount) onUserAction {
+  function deposit(uint256 amount) external nonReentrant whenDepositNotPaused noneZeroAmount(amount) onUserAction {
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -137,9 +139,13 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
+
+    emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
   function swap(uint256 amount) external nonReentrant whenSwapNotPaused noneZeroAmount(amount) onUserAction {
+    require(IERC20(_pToken).totalSupply() > 0, "No primary token minted yet");
+
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -150,6 +156,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);
+
+    emit Swap(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
   function claimBribes(uint256 epochId) external nonReentrant whenClaimBribesNotPaused validEpochId(epochId) onUserAction {
@@ -167,6 +175,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     address[] memory rewardTokens = stakingPool.rewardTokens();
     for (uint i; i < rewardTokens.length; i++) {
       address rewardToken = rewardTokens[i];
+      // This contract does not hold any user deposited tokens, so all the balance are treated as bribes
       uint256 totalRewards = IERC20(rewardToken).balanceOf(address(this));
       uint256 reward = totalRewards.mul(yTokenBalance).div(yTokenTotal);
       if (reward > 0) {
@@ -309,10 +318,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
-  
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenDummyBurned(uint256 indexed epochId, address indexed user, uint256 yTokenAmount);
 
+  event Deposit(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);
+  event Swap(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);
   event BribesClaimed(address indexed bribeToken, address indexed user, uint256 amount);
 
 }
