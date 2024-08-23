@@ -33,8 +33,8 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
     // Treasury fee rate. Default to 0%. [0, 10%]
     // _upsertParamConfig("TreasuryFeeRate", 0, 0, 10 ** 9);
 
-    // Epoch duration. Default to 90 days, [1 day, 1 year]
-    _upsertParamConfig("EpochDuration", 90 days, 1 days, 365 days);
+    // Epoch duration. Default to 90 days, [1 hour, 1 year]
+    _upsertParamConfig("EpochDuration", 90 days, 1 hours, 365 days);
   }
 
   /* ============== VIEWS =============== */

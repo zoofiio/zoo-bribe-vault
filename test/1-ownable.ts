@@ -103,6 +103,37 @@ describe("Ownable", () => {
     expect(await piBGT.name()).to.equal("Dummy Primary Token V2", "Margin token name is updated");
     expect(await piBGT.symbol()).to.equal("DmyPT2", "Primary token symbol is updated");
 
+    // Only admin could update vault's staking pool on emergency
+    await expect(dummyVault.connect(Bob).rescueFromStakingPool(100, Bob.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    // await expect(dummyVault.connect(Alice).rescueFromStakingPool(100, Alice.address)).not.to.be.reverted;
+    await expect(dummyVault.connect(Bob).updateStakingPool(Bob.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).updateStakingPool(Alice.address)).not.to.be.reverted;
+
+    // Only admin could pause a Vault
+    await expect(dummyVault.connect(Bob).pauseDeposit()).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Bob).pauseSwap()).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Bob).pauseClaimBribes()).to.be.revertedWith("Ownable: caller is not the owner"); 
+    await expect(dummyVault.connect(Alice).pauseDeposit())
+      .to.emit(dummyVault, "DepositPaused")
+      .withArgs();
+    await expect(dummyVault.connect(Alice).pauseSwap())
+      .to.emit(dummyVault, "SwapPaused")
+      .withArgs();
+    await expect(dummyVault.connect(Alice).pauseClaimBribes())
+      .to.emit(dummyVault, "ClaimBribesPaused")
+      .withArgs();
+    expect(await dummyVault.paused()).to.deep.equal([true, true, true], "Mint and redeem is paused");
+    await expect(dummyVault.connect(Alice).unpauseDeposit())
+      .to.emit(dummyVault, "DepositUnpaused")
+      .withArgs();
+    await expect(dummyVault.connect(Alice).unpauseSwap())
+      .to.emit(dummyVault, "SwapUnpaused")
+      .withArgs();
+    await expect(dummyVault.connect(Alice).unpauseClaimBribes())
+      .to.emit(dummyVault, "ClaimBribesUnpaused")
+      .withArgs();
+    expect(await dummyVault.paused()).to.deep.equal([false, false, false], "Mint and redeem is unpaused");
+
   });
 
 });

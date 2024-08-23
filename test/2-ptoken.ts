@@ -3,9 +3,7 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
 import { deployContractsFixture } from './utils';
-
 import { 
-  PToken__factory,
   MockPToken__factory
 } from '../typechain';
 

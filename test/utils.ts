@@ -52,6 +52,9 @@ export async function deployContractsFixture() {
   );
   const iBGTVault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
 
+  let trans = await protocol.connect(Alice).addVault(await iBGTVault.getAddress());
+  await trans.wait();
+
   return { 
     Alice, Bob, Caro, Dave,
     protocol, settings, stakingPool,
