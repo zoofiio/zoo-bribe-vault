@@ -35,6 +35,14 @@ contract MockVault is IVault {
 
   /* ========== IVault Functions ========== */
 
+  function currentEpochId() public pure returns (uint256) {
+    return 0;
+  }
+
+  function epochInfoById(uint256) public pure returns (Constants.Epoch memory) {
+    return Constants.Epoch(0, 0, 0, address(0));
+  }
+
   function assetToken() public view override returns (address) {
     return address(_assetToken);
   }
@@ -48,6 +56,22 @@ contract MockVault is IVault {
   }
 
   function paramValue(bytes32) public pure returns (uint256) {
+    return 0;
+  }
+
+  function yTokenTotalSupply(uint256) public pure returns (uint256) {
+    return 0;
+  }
+
+  function yTokenUserBalance(uint256, address) public pure returns (uint256) {
+    return 0;
+  }
+
+  function lastEpochSwapTimestamp(uint256) public pure returns (uint256) {
+    return 0;
+  }
+
+  function lastEpochSwapPrice(uint256) public pure returns (uint256) {
     return 0;
   }
 

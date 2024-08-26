@@ -5,6 +5,10 @@ import "../libs/Constants.sol";
 
 interface IVault {
 
+  function currentEpochId() external view returns (uint256);
+
+  function epochInfoById(uint256 epochId) external view returns (Constants.Epoch memory);
+
   function assetToken() external view returns (address);
 
   function assetBalance() external view returns (uint256);
@@ -12,5 +16,13 @@ interface IVault {
   function pToken() external view returns (address);
 
   function paramValue(bytes32 param) external view returns (uint256);
+
+  function yTokenTotalSupply(uint256 epochId) external view returns (uint256);
+
+  function yTokenUserBalance(uint256 epochId, address user) external view returns (uint256);
+
+  function lastEpochSwapTimestamp(uint256 epochId) external view returns (uint256);
+
+  function lastEpochSwapPrice(uint256 epochId) external view returns (uint256);
 
 }

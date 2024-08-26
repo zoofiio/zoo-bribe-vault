@@ -13,6 +13,7 @@ import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
+import "../libs/VaultCalculator.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IStakingPool.sol";
@@ -27,6 +28,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using SafeMath for uint256;
   using Strings for uint256;
+  using VaultCalculator for IVault;
 
   bool internal _depositPaused;
   bool internal _swapPaused;
@@ -46,7 +48,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   mapping(uint256 => mapping(address => uint256)) _yTokenUserBalances;
 
   mapping(uint256 => uint256) _lastEpochSwapTimestamp;
-  mapping(uint256 => uint256) _lastEpochSwapA;
   mapping(uint256 => uint256) _lastEpochSwapPrice;  // P(S,t)
 
   constructor(
@@ -95,7 +96,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function currentEpochId() public view returns (uint256) {
-    require(_currentEpochId.current() > 0, "No epochs yet");
+    // require(_currentEpochId.current() > 0, "No epochs yet");
     return _currentEpochId.current();
   }
 
@@ -123,133 +124,16 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return settings.vaultParamValue(address(this), param);
   }
 
+  function lastEpochSwapTimestamp(uint256 epochId) public view returns (uint256) {
+    return _lastEpochSwapTimestamp[epochId];
+  }
+
+  function lastEpochSwapPrice(uint256 epochId) public view returns (uint256) {
+    return _lastEpochSwapPrice[epochId];
+  }
+
   function calcSwapForYTokens(uint256 assetAmount) public view returns (Constants.SwapForYTokensArgs memory) {
-    uint256 epochId = _currentEpochId.current();
-    require(epochId > 0, "No epochs yet");
-
-    Constants.SwapForYTokensArgs memory args;
-
-    bool firstEpochSwap = true;
-    uint256 lastEpochSwapPrice = 0;
-    uint256 epochEndTime = 0;
-    args.D = settings.vaultParamValue(address(this), "D");
-    if (_epochs[epochId].startTime.add(_epochs[epochId].duration) >= block.timestamp) {
-      // in current epoch
-      args.M = _yTokenTotalSupply[epochId];
-      args.S = _yTokenUserBalances[epochId][address(this)];
-      args.t0 = _epochs[epochId].startTime;
-
-      if (_lastEpochSwapTimestamp[epochId] > 0) {
-        args.deltaT = block.timestamp.sub(_lastEpochSwapTimestamp[epochId]);
-        firstEpochSwap = false;
-        lastEpochSwapPrice = _lastEpochSwapPrice[epochId];
-      } else {
-        args.deltaT = block.timestamp.sub(_epochs[epochId].startTime);
-      }
-      epochEndTime = _epochs[epochId].startTime.add(_epochs[epochId].duration);
-    } 
-    else {
-      // in a new epoch
-      args.M = _yTokenUserBalances[epochId][address(this)];
-      args.S = _yTokenUserBalances[epochId][address(this)];
-      args.t0 = block.timestamp;
-      args.deltaT = 0;
-      epochEndTime = block.timestamp.add(args.D);
-    }
-    
-    args.T = settings.vaultParamValue(address(this), "T");
-    args.t = block.timestamp;
-    args.e1 = settings.vaultParamValue(address(this), "e1");
-    args.e2 = settings.vaultParamValue(address(this), "e2");
-
-    if (firstEpochSwap) {
-      // a = APRi * D / 365
-      uint256 APRi = settings.vaultParamValue(address(this), "APRi");
-      args.a_scaled = APRi.mul(args.D).div(365 days);
-    }
-    else {
-      // a = P / (1 + e1 * (M - S) / M)
-      require(lastEpochSwapPrice > 0, "Invalid last epoch swap price");
-      args.a_scaled = lastEpochSwapPrice.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
-        (Constants.SCALE_FACTOR).add(
-          args.e1.mul(args.M.sub(args.S)).mul(Constants.SCALE_FACTOR).div(args.M)
-        )
-      );
-    }
-
-    // P(L(t)) = APRl * (D - t) / 365
-    uint256 APRl = settings.vaultParamValue(address(this), "APRl");
-    args.P_floor_scaled = APRl.mul(epochEndTime.sub(args.t)).div(365 days);
-
-    /**
-     * P(S,t) = a * (
-     *    (1 + e1 * (M - S) / M) - deltaT / (
-     *      T * (1 + (M - S) / (e2 * M))
-     *    )
-     * )
-     * 
-     * P(S,t)_scaled = a * (
-     *    (10**10 + e1 * (M - S) * 10**10 / M) - deltaT * 10**10 * 10**10 / (
-     *      T * (10**10 + (M - S)*10**10 / (e2 * M))
-     *    )
-     * ) / (10**10)
-     */
-    uint256 dominator_scaled = Constants.SCALE_FACTOR.add(
-        args.e1.mul(args.M.sub(args.S)).mul(Constants.SCALE_FACTOR).div(args.M)
-      ).sub(
-        args.deltaT.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
-          args.T.mul(
-            Constants.SCALE_FACTOR.add(
-              args.M.sub(args.S).mul(Constants.SCALE_FACTOR).div(args.e2.mul(args.M))
-            )
-          )
-        )
-      );
-    args.P_scaled = args.a_scaled.mul(
-      dominator_scaled
-    ).div(Constants.SCALE_FACTOR);
-
-    bool useFloorPrice = args.P_scaled < args.P_floor_scaled;
-    if (useFloorPrice) {
-      /**
-       * a1 = P_floor / (
-       *    (1 + e1 * (M - S) / M) - deltaT / (
-       *        T * (1 + (M - S) / (e2 * M))
-       *    )
-       * )
-       */
-      args.a_scaled = args.P_floor_scaled.mul(Constants.SCALE_FACTOR).div(dominator_scaled);
-    }
-
-    // A = a / M
-    args.A = args.a_scaled.div(args.M);
-
-    /**
-     * B = a * deltaT / (
-     *    T * (1 + (M - S) / (e2 * M))
-     * ) - a - e1 * a
-     */
-    args.B = args.a_scaled.mul(args.deltaT).mul(Constants.SCALE_FACTOR).div(
-      args.T.mul(
-        Constants.SCALE_FACTOR.add(
-          args.M.sub(args.S).mul(Constants.SCALE_FACTOR).div(args.e2.mul(args.M))
-        )
-      )
-    ).sub(args.a_scaled).sub(args.e1.mul(args.a_scaled));
-
-    // C = X
-    args.C = assetAmount;
-
-    /**
-     * Y(X) = B + sqrt(B * B + 4 * A * C) / (2 * A)
-     */
-    args.Y = args.B.add(
-      Math.sqrt(
-        args.B.mul(args.B).add(args.A.mul(4).mul(args.C))
-      )
-    ).div(args.A.mul(2));
-
-    return args;
+    return IVault(this).doCalcSwapForYTokens(assetAmount);
   }
 
 
