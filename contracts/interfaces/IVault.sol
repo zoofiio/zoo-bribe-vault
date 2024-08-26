@@ -21,8 +21,8 @@ interface IVault {
 
   function yTokenUserBalance(uint256 epochId, address user) external view returns (uint256);
 
-  function lastEpochSwapTimestamp(uint256 epochId) external view returns (uint256);
+  function epochLastSwapTimestamp(uint256 epochId) external view returns (uint256);
 
-  function lastEpochSwapPrice(uint256 epochId) external view returns (uint256);
+  function epochLastSwapPrice(uint256 epochId) external view returns (uint256);
 
 }

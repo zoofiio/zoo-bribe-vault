@@ -19,7 +19,7 @@ library VaultCalculator {
     Constants.SwapForYTokensArgs memory args;
 
     bool firstEpochSwap = true;
-    uint256 lastEpochSwapPrice = 0;
+    uint256 epochLastSwapPrice = 0;
     uint256 epochEndTime = 0;
     args.D = self.paramValue("D");
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
@@ -29,10 +29,10 @@ library VaultCalculator {
       args.S = self.yTokenUserBalance(epochId, address(this));
       args.t0 = epoch.startTime;
 
-      if (self.lastEpochSwapTimestamp(epochId) > 0) {
-        args.deltaT = block.timestamp.sub(self.lastEpochSwapTimestamp(epochId));
+      if (self.epochLastSwapTimestamp(epochId) > 0) {
+        args.deltaT = block.timestamp.sub(self.epochLastSwapTimestamp(epochId));
         firstEpochSwap = false;
-        lastEpochSwapPrice = self.lastEpochSwapPrice(epochId);
+        epochLastSwapPrice = self.epochLastSwapPrice(epochId);
       } else {
         args.deltaT = block.timestamp.sub(epoch.startTime);
       }
@@ -59,8 +59,8 @@ library VaultCalculator {
     }
     else {
       // a = P / (1 + e1 * (M - S) / M)
-      require(lastEpochSwapPrice > 0, "Invalid last epoch swap price");
-      args.a_scaled = lastEpochSwapPrice.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
+      require(epochLastSwapPrice > 0, "Invalid last epoch swap price");
+      args.a_scaled = epochLastSwapPrice.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
         (Constants.SCALE_FACTOR).add(
           args.e1.mul(args.M.sub(args.S)).mul(Constants.SCALE_FACTOR).div(args.M)
         )

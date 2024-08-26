@@ -46,9 +46,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   mapping(uint256 => uint256) _yTokenTotalSupply;
   mapping(uint256 => mapping(address => uint256)) _yTokenUserBalances;
+  mapping(uint256 => uint256) _yTokenTotalSupplySynthetic;
+  mapping(uint256 => mapping(address => uint256)) _yTokenUserBalancesSynthetic;
 
-  mapping(uint256 => uint256) _lastEpochSwapTimestamp;
-  mapping(uint256 => uint256) _lastEpochSwapPrice;  // P(S,t)
+  mapping(uint256 => uint256) _epochLastSwapTimestamp;
+  mapping(uint256 => uint256) _epochLastSwapPrice;  // P(S,t)
 
   constructor(
     address _protocol,
@@ -124,12 +126,12 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return settings.vaultParamValue(address(this), param);
   }
 
-  function lastEpochSwapTimestamp(uint256 epochId) public view returns (uint256) {
-    return _lastEpochSwapTimestamp[epochId];
+  function epochLastSwapTimestamp(uint256 epochId) public view returns (uint256) {
+    return _epochLastSwapTimestamp[epochId];
   }
 
-  function lastEpochSwapPrice(uint256 epochId) public view returns (uint256) {
-    return _lastEpochSwapPrice[epochId];
+  function epochLastSwapPrice(uint256 epochId) public view returns (uint256) {
+    return _epochLastSwapPrice[epochId];
   }
 
   function calcSwapForYTokens(uint256 assetAmount) public view returns (Constants.SwapForYTokensArgs memory) {
@@ -153,11 +155,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 currentEpochEndTime = currentEpoch.startTime.add(currentEpoch.duration);
     require(block.timestamp <= currentEpochEndTime, "Current epoch has ended");
 
-    // uint256 yTokenAmount = amount * (currentEpochEndTime - block.timestamp) / 3600;
     uint256 yTokenAmount = amount;
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
+
+    uint256 yTokenAmountSynthetic = yTokenAmount.mul(currentEpochEndTime.sub(block.timestamp));
+    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
+    _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].add(yTokenAmountSynthetic);
 
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
@@ -176,6 +181,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);
 
+    Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
+    uint256 yTokenAmountSynthetic = yTokenAmount.mul(epoch.startTime.add(epoch.duration).sub(block.timestamp));
+    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
+    _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()].add(yTokenAmountSynthetic);
+
     emit Swap(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
@@ -184,14 +194,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 epochEndTime = epoch.startTime.add(epoch.duration);
     require(block.timestamp > epochEndTime, "Epoch not ended yet");
 
-    uint256 yTokenBalance = _yTokenUserBalances[epochId][_msgSender()];
-    require(yTokenBalance > 0, "No yToken balance");
-    uint256 yTokenTotal= _yTokenTotalSupply[epochId];
-    require(yTokenTotal >= yTokenBalance, "Invalid yToken balance");
+    uint256 yTokenBalanceSynthetic = _yTokenUserBalancesSynthetic[epochId][_msgSender()];
+    require(yTokenBalanceSynthetic > 0, "No yToken balance");
+    uint256 yTokenTotalSynthetic= _yTokenTotalSupplySynthetic[epochId];
+    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
 
-    _yTokenUserBalances[epochId][_msgSender()] = 0;
-    _yTokenTotalSupply[epochId] = yTokenTotal.sub(yTokenBalance);
-    emit YTokenDummyBurned(epochId, _msgSender(), yTokenBalance);
+    _yTokenUserBalancesSynthetic[epochId][_msgSender()] = 0;
+    _yTokenTotalSupplySynthetic[epochId] = yTokenTotalSynthetic.sub(yTokenBalanceSynthetic);
+    emit YTokenDummyBurned(epochId, _msgSender(), yTokenBalanceSynthetic);
 
     stakingPool.getReward();
 
@@ -200,7 +210,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
       address rewardToken = rewardTokens[i];
       // This contract does not hold any user deposited tokens, so all the balance are treated as bribes
       uint256 totalRewards = IERC20(rewardToken).balanceOf(address(this));
-      uint256 reward = totalRewards.mul(yTokenBalance).div(yTokenTotal);
+      uint256 reward = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic);
       if (reward > 0) {
         TokensTransfer.transferTokens(rewardToken, address(this), _msgSender(), reward);
         emit BribesClaimed(rewardToken, _msgSender(), reward);
@@ -281,12 +291,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
     // Y tokens virtually hold by the Vault, need move to new epoch
     if (oldEpochId  > 0) {
-      uint256 yTokenAmount = _yTokenUserBalances[oldEpochId][address(this)];
-      if (yTokenAmount > 0) {
-        _yTokenTotalSupply[epochId] = _yTokenTotalSupply[epochId].add(yTokenAmount);
-        _yTokenUserBalances[epochId][address(this)] = _yTokenUserBalances[epochId][address(this)].add(yTokenAmount);
-        emit YTokenDummyMinted(epochId, address(this), 0, yTokenAmount);
-      }
+      _yTokenTotalSupply[epochId] = _yTokenUserBalances[oldEpochId][address(this)];
+      _yTokenUserBalances[epochId][address(this)] = _yTokenUserBalances[oldEpochId][address(this)];
+
+      _yTokenTotalSupplySynthetic[epochId] = _yTokenUserBalancesSynthetic[oldEpochId][address(this)];
+      _yTokenUserBalancesSynthetic[epochId][address(this)] = _yTokenUserBalancesSynthetic[oldEpochId][address(this)];
     }
   }
 

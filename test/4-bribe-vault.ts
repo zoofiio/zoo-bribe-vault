@@ -32,7 +32,7 @@ describe('Bribe Vault', () => {
     await expect(iBGTVault.epochInfoById(0)).to.be.revertedWith("Invalid epoch id");
 
     // Could not swap before any deposits
-    await expect(iBGTVault.connect(Alice).swap(100)).to.be.revertedWith("No primary token minted yet");
+    await expect(iBGTVault.connect(Alice).swapForYTokens(100)).to.be.revertedWith("No primary token minted yet");
 
     // First deposit automaticaly starts a new epoch.
     // Alice deposits 1000 $iBGT, Bob deposits 500 $iBGT
@@ -90,7 +90,7 @@ describe('Bribe Vault', () => {
     let aliceSwapAmount = ethers.parseUnits("150", await iBGT.decimals());
     let aliceExpectedYTokenAmount = aliceSwapAmount * 3600n;  // testing only
     await expect(iBGT.connect(Alice).approve(await iBGTVault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
-    trans = await iBGTVault.connect(Alice).swap(aliceSwapAmount);
+    trans = await iBGTVault.connect(Alice).swapForYTokens(aliceSwapAmount);
     await expect(trans).to.changeTokenBalances(
       iBGT,
       [Alice.address, await stakingPool.getAddress()],

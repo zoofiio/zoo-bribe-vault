@@ -7,6 +7,7 @@ import {
   MockRebasableERC20__factory,
   ZooProtocol__factory,
   Vault__factory,
+  VaultCalculator__factory,
   MockStakingPool__factory,
 } from "../typechain";
 
@@ -45,7 +46,15 @@ export async function deployContractsFixture() {
   const MockStakingPool = await MockStakingPoolFactory.deploy(await protocol.owner(), await iBGT.getAddress());
   const stakingPool = MockStakingPool__factory.connect(await MockStakingPool.getAddress(), provider);
 
-  const VaultFactory = await ethers.getContractFactory("Vault");
+  const VaultCalculatorFactory = await ethers.getContractFactory("VaultCalculator");
+  const VaultCalculator = await VaultCalculatorFactory.deploy();
+  const vaultCalculator = VaultCalculator__factory.connect(await VaultCalculator.getAddress(), provider);
+
+  const VaultFactory = await ethers.getContractFactory("Vault", {
+    libraries: {
+      VaultCalculator: await vaultCalculator.getAddress(),
+    }
+  });
   const iBGTVaultContract = await VaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
@@ -58,7 +67,7 @@ export async function deployContractsFixture() {
   return { 
     Alice, Bob, Caro, Dave,
     protocol, settings, stakingPool,
-    iBGT, stETH, iBGTVault
+    iBGT, stETH, vaultCalculator, iBGTVault
   };
 }
 

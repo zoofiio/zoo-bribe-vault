@@ -47,7 +47,7 @@ describe("Ownable", () => {
 
   it("Privileged operations", async () => {
     const {
-      Alice, Bob, protocol, settings, iBGTVault, stakingPool,
+      Alice, Bob, protocol, settings, iBGTVault, stakingPool, vaultCalculator
     } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await iBGTVault.pToken(), provider);
 
@@ -59,7 +59,11 @@ describe("Ownable", () => {
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
     const MockERC20 = await MockERC20Factory.deploy("Dummy Token", "DMY");
     const dummyToken = MockERC20__factory.connect(await MockERC20.getAddress(), provider);
-    const VaultFactory = await ethers.getContractFactory("Vault");
+    const VaultFactory = await ethers.getContractFactory("Vault", {
+      libraries: {
+        VaultCalculator: await vaultCalculator.getAddress(),
+      }
+    });
     const DmyVaultContract = await VaultFactory.deploy(
       await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
       await dummyToken.getAddress(), "Zoo pDmy", "pDmy"

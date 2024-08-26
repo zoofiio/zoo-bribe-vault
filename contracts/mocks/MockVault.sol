@@ -67,11 +67,11 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function lastEpochSwapTimestamp(uint256) public pure returns (uint256) {
+  function epochLastSwapTimestamp(uint256) public pure returns (uint256) {
     return 0;
   }
 
-  function lastEpochSwapPrice(uint256) public pure returns (uint256) {
+  function epochLastSwapPrice(uint256) public pure returns (uint256) {
     return 0;
   }
 
