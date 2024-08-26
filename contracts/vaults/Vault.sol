@@ -6,6 +6,7 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
@@ -43,6 +44,10 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
   mapping(uint256 => uint256) _yTokenTotalSupply;
   mapping(uint256 => mapping(address => uint256)) _yTokenUserBalances;
+
+  mapping(uint256 => uint256) _lastEpochSwapTimestamp;
+  mapping(uint256 => uint256) _lastEpochSwapA;
+  mapping(uint256 => uint256) _lastEpochSwapPrice;  // P(S,t)
 
   constructor(
     address _protocol,
@@ -118,6 +123,136 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return settings.vaultParamValue(address(this), param);
   }
 
+  function calcSwapForYTokens(uint256 assetAmount) public view returns (Constants.SwapForYTokensArgs memory) {
+    uint256 epochId = _currentEpochId.current();
+    require(epochId > 0, "No epochs yet");
+
+    Constants.SwapForYTokensArgs memory args;
+
+    bool firstEpochSwap = true;
+    uint256 lastEpochSwapPrice = 0;
+    uint256 epochEndTime = 0;
+    args.D = settings.vaultParamValue(address(this), "D");
+    if (_epochs[epochId].startTime.add(_epochs[epochId].duration) >= block.timestamp) {
+      // in current epoch
+      args.M = _yTokenTotalSupply[epochId];
+      args.S = _yTokenUserBalances[epochId][address(this)];
+      args.t0 = _epochs[epochId].startTime;
+
+      if (_lastEpochSwapTimestamp[epochId] > 0) {
+        args.deltaT = block.timestamp.sub(_lastEpochSwapTimestamp[epochId]);
+        firstEpochSwap = false;
+        lastEpochSwapPrice = _lastEpochSwapPrice[epochId];
+      } else {
+        args.deltaT = block.timestamp.sub(_epochs[epochId].startTime);
+      }
+      epochEndTime = _epochs[epochId].startTime.add(_epochs[epochId].duration);
+    } 
+    else {
+      // in a new epoch
+      args.M = _yTokenUserBalances[epochId][address(this)];
+      args.S = _yTokenUserBalances[epochId][address(this)];
+      args.t0 = block.timestamp;
+      args.deltaT = 0;
+      epochEndTime = block.timestamp.add(args.D);
+    }
+    
+    args.T = settings.vaultParamValue(address(this), "T");
+    args.t = block.timestamp;
+    args.e1 = settings.vaultParamValue(address(this), "e1");
+    args.e2 = settings.vaultParamValue(address(this), "e2");
+
+    if (firstEpochSwap) {
+      // a = APRi * D / 365
+      uint256 APRi = settings.vaultParamValue(address(this), "APRi");
+      args.a_scaled = APRi.mul(args.D).div(365 days);
+    }
+    else {
+      // a = P / (1 + e1 * (M - S) / M)
+      require(lastEpochSwapPrice > 0, "Invalid last epoch swap price");
+      args.a_scaled = lastEpochSwapPrice.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
+        (Constants.SCALE_FACTOR).add(
+          args.e1.mul(args.M.sub(args.S)).mul(Constants.SCALE_FACTOR).div(args.M)
+        )
+      );
+    }
+
+    // P(L(t)) = APRl * (D - t) / 365
+    uint256 APRl = settings.vaultParamValue(address(this), "APRl");
+    args.P_floor_scaled = APRl.mul(epochEndTime.sub(args.t)).div(365 days);
+
+    /**
+     * P(S,t) = a * (
+     *    (1 + e1 * (M - S) / M) - deltaT / (
+     *      T * (1 + (M - S) / (e2 * M))
+     *    )
+     * )
+     * 
+     * P(S,t)_scaled = a * (
+     *    (10**10 + e1 * (M - S) * 10**10 / M) - deltaT * 10**10 * 10**10 / (
+     *      T * (10**10 + (M - S)*10**10 / (e2 * M))
+     *    )
+     * ) / (10**10)
+     */
+    uint256 dominator_scaled = Constants.SCALE_FACTOR.add(
+        args.e1.mul(args.M.sub(args.S)).mul(Constants.SCALE_FACTOR).div(args.M)
+      ).sub(
+        args.deltaT.mul(Constants.SCALE_FACTOR).mul(Constants.SCALE_FACTOR).div(
+          args.T.mul(
+            Constants.SCALE_FACTOR.add(
+              args.M.sub(args.S).mul(Constants.SCALE_FACTOR).div(args.e2.mul(args.M))
+            )
+          )
+        )
+      );
+    args.P_scaled = args.a_scaled.mul(
+      dominator_scaled
+    ).div(Constants.SCALE_FACTOR);
+
+    bool useFloorPrice = args.P_scaled < args.P_floor_scaled;
+    if (useFloorPrice) {
+      /**
+       * a1 = P_floor / (
+       *    (1 + e1 * (M - S) / M) - deltaT / (
+       *        T * (1 + (M - S) / (e2 * M))
+       *    )
+       * )
+       */
+      args.a_scaled = args.P_floor_scaled.mul(Constants.SCALE_FACTOR).div(dominator_scaled);
+    }
+
+    // A = a / M
+    args.A = args.a_scaled.div(args.M);
+
+    /**
+     * B = a * deltaT / (
+     *    T * (1 + (M - S) / (e2 * M))
+     * ) - a - e1 * a
+     */
+    args.B = args.a_scaled.mul(args.deltaT).mul(Constants.SCALE_FACTOR).div(
+      args.T.mul(
+        Constants.SCALE_FACTOR.add(
+          args.M.sub(args.S).mul(Constants.SCALE_FACTOR).div(args.e2.mul(args.M))
+        )
+      )
+    ).sub(args.a_scaled).sub(args.e1.mul(args.a_scaled));
+
+    // C = X
+    args.C = assetAmount;
+
+    /**
+     * Y(X) = B + sqrt(B * B + 4 * A * C) / (2 * A)
+     */
+    args.Y = args.B.add(
+      Math.sqrt(
+        args.B.mul(args.B).add(args.A.mul(4).mul(args.C))
+      )
+    ).div(args.A.mul(2));
+
+    return args;
+  }
+
+
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function deposit(uint256 amount) external nonReentrant whenDepositNotPaused noneZeroAmount(amount) onUserAction {
@@ -143,7 +278,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
-  function swap(uint256 amount) external nonReentrant whenSwapNotPaused noneZeroAmount(amount) onUserAction {
+  function swapForYTokens(uint256 amount) external nonReentrant whenSwapNotPaused noneZeroAmount(amount) onUserAction {
     require(IERC20(_pToken).totalSupply() > 0, "No primary token minted yet");
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
@@ -152,7 +287,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 pTokenAmount = amount;
     IPToken(_pToken).rebase(pTokenAmount);
 
-    uint256 yTokenAmount = amount * 3600; // testing only
+    uint256 yTokenAmount = calcSwapForYTokens(amount).Y;
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);
@@ -161,6 +296,10 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function claimBribes(uint256 epochId) external nonReentrant whenClaimBribesNotPaused validEpochId(epochId) onUserAction {
+    Constants.Epoch memory epoch = _epochs[epochId];
+    uint256 epochEndTime = epoch.startTime.add(epoch.duration);
+    require(block.timestamp > epochEndTime, "Epoch not ended yet");
+
     uint256 yTokenBalance = _yTokenUserBalances[epochId][_msgSender()];
     require(yTokenBalance > 0, "No yToken balance");
     uint256 yTokenTotal= _yTokenTotalSupply[epochId];
@@ -245,15 +384,26 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function _startNewEpoch() internal {
-    _currentEpochId.increment();
+    uint256 oldEpochId = _currentEpochId.current();
 
+    _currentEpochId.increment();
     uint256 epochId = _currentEpochId.current();
     _allEpochIds.pushBack(bytes32(epochId));
 
     _epochs[epochId].epochId = epochId;
     _epochs[epochId].startTime = block.timestamp;
-    _epochs[epochId].duration = settings.vaultParamValue(address(this), "EpochDuration");
+    _epochs[epochId].duration = settings.vaultParamValue(address(this), "D");
     _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
+
+    // Y tokens virtually hold by the Vault, need move to new epoch
+    if (oldEpochId  > 0) {
+      uint256 yTokenAmount = _yTokenUserBalances[oldEpochId][address(this)];
+      if (yTokenAmount > 0) {
+        _yTokenTotalSupply[epochId] = _yTokenTotalSupply[epochId].add(yTokenAmount);
+        _yTokenUserBalances[epochId][address(this)] = _yTokenUserBalances[epochId][address(this)].add(yTokenAmount);
+        emit YTokenDummyMinted(epochId, address(this), 0, yTokenAmount);
+      }
+    }
   }
 
   /* ============== MODIFIERS =============== */
