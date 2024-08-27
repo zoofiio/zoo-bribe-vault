@@ -71,7 +71,7 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function epochLastSwapPrice(uint256) public pure returns (uint256) {
+  function epochLastSwapPriceScaled(uint256) public pure returns (uint256) {
     return 0;
   }
 

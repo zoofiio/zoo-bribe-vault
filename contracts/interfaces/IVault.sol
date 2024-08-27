@@ -23,6 +23,6 @@ interface IVault {
 
   function epochLastSwapTimestamp(uint256 epochId) external view returns (uint256);
 
-  function epochLastSwapPrice(uint256 epochId) external view returns (uint256);
+  function epochLastSwapPriceScaled(uint256 epochId) external view returns (uint256);
 
 }

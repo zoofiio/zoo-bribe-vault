@@ -98,7 +98,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function currentEpochId() public view returns (uint256) {
-    // require(_currentEpochId.current() > 0, "No epochs yet");
+    require(_currentEpochId.current() > 0, "No epochs yet");
     return _currentEpochId.current();
   }
 
@@ -130,7 +130,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochLastSwapTimestamp[epochId];
   }
 
-  function epochLastSwapPrice(uint256 epochId) public view returns (uint256) {
+  function epochLastSwapPriceScaled(uint256 epochId) public view returns (uint256) {
     return _epochLastSwapPrice[epochId];
   }
 

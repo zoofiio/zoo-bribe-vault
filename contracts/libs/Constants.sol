@@ -9,8 +9,6 @@ library Constants {
 
   uint256 public constant PROTOCOL_DECIMALS = 10;
 
-  uint256 public constant SCALE_FACTOR = 10 ** PROTOCOL_DECIMALS;
-
   struct Epoch {
     uint256 epochId;
     uint256 startTime;
@@ -29,13 +27,27 @@ library Constants {
     uint256 e1;
     uint256 e2;
 
+    uint256 APRi;
+    uint256 APRl;
     uint256 a_scaled;
     uint256 P_floor_scaled;
     uint256 P_scaled;
+    bool P_scaled_positive;
     uint256 A;
     uint256 B;
     uint256 C;
     uint256 Y;
+  }
+
+  struct Terms {
+    uint256 T1;
+    uint256 T2;
+    uint256 T3;
+    uint256 T4;
+    uint256 T5;
+    uint256 T6;
+    uint256 T7;
+    uint256 T8;
   }
 
 }
