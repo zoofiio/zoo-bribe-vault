@@ -1,6 +1,8 @@
 import _ from 'lodash';
 import { expect } from "chai";
+import { encodeBytes32String, formatUnits } from "ethers";
 import { ethers } from "hardhat";
+import { time } from '@nomicfoundation/hardhat-network-helpers';
 import {
   MockERC20__factory,
   ProtocolSettings__factory,
@@ -9,11 +11,14 @@ import {
   Vault__factory,
   VaultCalculator__factory,
   MockStakingPool__factory,
+  Vault,
 } from "../typechain";
 
 const { provider } = ethers;
 
 export const ONE_DAY_IN_SECS = 24 * 60 * 60;
+
+export const SETTINGS_DECIMALS = 10;
 
 export const nativeTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -131,3 +136,132 @@ export const makeToken = async (name: string, symbol: string, decimals: number =
   await erc20.connect(Alice).setDecimals(decimals);
   return erc20
 };
+
+export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) {
+  // const SCALE = 10 ** 18;
+  const yTokenDecimals = 18;
+  const epochId = await vault.currentEpochId();
+
+  let firstEpochSwap = true;
+  let epochLastSwapPriceScaled = 0;
+  let epochEndTime = 0;
+
+  // const D = ethers.formatUnits(await vault.paramValue("D"), SETTINGS_DECIMALS);
+  let D, M, S, t0, deltaT;
+  D = Number(await vault.paramValue(encodeBytes32String("D")));
+  console.log(`expectedSwapForYTokens, D: ${D}`);
+  const epoch = await vault.epochInfoById(epochId);
+  if (epoch.startTime + epoch.duration >= await time.latest()) {
+    // in current epoch
+    M = Number(formatUnits(await vault.yTokenTotalSupply(epochId), yTokenDecimals));
+    S = Number(formatUnits(await vault.yTokenUserBalance(epochId, await vault.getAddress()), yTokenDecimals));
+    t0 = epoch.startTime;
+    console.log(`expectedSwapForYTokens, M: ${M}, S: ${S}, t0: ${t0}`);
+
+    if (await vault.epochLastSwapTimestamp(epochId) > 0) {
+      deltaT = (await time.latest()) - Number(await vault.epochLastSwapTimestamp(epochId));
+      firstEpochSwap = false;
+      epochLastSwapPriceScaled = Number(await vault.epochLastSwapPriceScaled(epochId));
+    } else {
+      deltaT = (await time.latest()) - Number(epoch.startTime);
+    }
+    epochEndTime = Number(epoch.startTime + epoch.duration);
+  }
+  else {
+    // in a new epoch
+    M = Number(formatUnits(await vault.yTokenUserBalance(epochId, await vault.getAddress()), yTokenDecimals));
+    S = Number(formatUnits(await vault.yTokenUserBalance(epochId, await vault.getAddress()), yTokenDecimals));
+    t0 = await time.latest();
+    deltaT = 0;
+    epochEndTime = await time.latest() + D;
+
+    console.log(`expectedSwapForYTokens, new epoch, M: ${M}, S: ${S}, t0: ${t0}, deltaT: ${deltaT}`);
+  }
+
+  const T = Number(await vault.paramValue(encodeBytes32String("T")));
+  const t = await time.latest();
+  const e1 = Number(await vault.paramValue(encodeBytes32String("e1")));
+  const e2 = Number(await vault.paramValue(encodeBytes32String("e2")));
+  console.log(`expectedSwapForYTokens, T: ${T}, t: ${t}`);
+  console.log(`expectedSwapForYTokens, e1: ${e1}, e2: ${e2}`);
+
+  let APRi, APRl, a;
+  if (firstEpochSwap) {
+    // a = APRi * D / 365
+    APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
+    a = APRi * D / (365 * ONE_DAY_IN_SECS);
+    console.log(`expectedSwapForYTokens, first swap of epoch, APRi: ${APRi}, a: ${a}`);
+  }
+  else {
+    // a = P / (1 + e1 * (M - S) / M)
+    if (epochLastSwapPriceScaled <= 0) { console.log("Invalid last epoch swap price"); return -1; }
+    a = epochLastSwapPriceScaled / (
+      1 + e1 * (M - S) / M
+    );
+    console.log(`expectedSwapForYTokens, not first swap of epoch, a: ${a}`);
+  }
+
+  // P(L(t)) = APRl * (D - t) / 365
+  APRl = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRl")), SETTINGS_DECIMALS));
+  const P_floor_scaled = APRl * (D - deltaT) / (365 * ONE_DAY_IN_SECS);
+  console.log(`expectedSwapForYTokens, APRl: ${APRl}, P_floor_scaled: ${P_floor_scaled}`);
+
+  /**
+   * P(S,t) = a * (
+   *    (1 + e1 * (M - S) / M) - deltaT / (
+   *      T * (1 + (M - S) / (e2 * M))
+   *    )
+   * )
+   * 
+   */
+  const P_scaled = a * (
+    (1 + e1 * (M - S) / M) - deltaT / (
+      T * (1 + (M - S) / (e2 * M))
+    )
+  );
+  console.log(`expectedSwapForYTokens, P_scaled: ${P_scaled}`);
+
+  const useFloorPrice = P_scaled < P_floor_scaled;
+  if (useFloorPrice) {
+    /**
+     * a1 = P_floor / (
+     *    (1 + e1 * (M - S) / M) - deltaT / (
+     *        T * (1 + (M - S) / (e2 * M))
+     *    )
+     * )
+     */
+    a = P_floor_scaled / (
+      (1 + e1 * (M - S) / M) - deltaT / (
+        T * (1 + (M - S) / (e2 * M))
+      )
+    );
+    if (a < 0) a = -a;  // ?
+    console.log(`expectedSwapForYTokens, useFloorPrice, a: ${a}`);
+  }
+
+  // A = a / M
+  const A = a / M;  // scale: 10 ** (10 + 18)
+  console.log(`expectedSwapForYTokens, A: ${A}`);
+
+  /**
+   * B = a * deltaT / (
+   *    T * (1 + (M - S) / (e2 * M))
+   * ) - a - e1 * a
+   */
+  const B = a * deltaT / (
+    T * (1 + (M - S) / (e2 * M))
+  ) - a - e1 * a;
+  console.log(`expectedSwapForYTokens, B: ${B}`);
+
+  // C = X
+  const C = assetAmount;
+  console.log(`expectedSwapForYTokens, C: ${C}`);
+
+  /**
+   * Y(X) = (B + sqrt(B * B + 4 * A * C)) / (2 * A)
+   */
+  const Y = (B + Math.sqrt(B * B + 4 * A * C)) / (2 * A);
+  console.log(`expectedSwapForYTokens, Y: ${Y}`);
+
+  
+}

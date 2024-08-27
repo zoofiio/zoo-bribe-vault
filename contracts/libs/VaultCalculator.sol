@@ -111,7 +111,7 @@ library VaultCalculator {
     if (args.P_scaled_positive) {
       T.T3 = SCALE.add(T.T1).sub(T.T2);   // scale: 10 ** 18
     } else {
-      T.T3 = SCALE.add(T.T2).sub(T.T1);   // scale: 10 ** 18
+      T.T3 = T.T2.sub(T.T1).sub(SCALE);   // scale: 10 ** 18
     }
     args.P_scaled = args.a_scaled.mul(T.T3).div(SCALE);   // scale: 10 ** (10 + 18)
     console.log("doCalcSwapForYTokens, P_scaled: %s", args.P_scaled);

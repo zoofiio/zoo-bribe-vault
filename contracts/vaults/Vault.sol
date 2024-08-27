@@ -176,7 +176,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 pTokenAmount = amount;
     IPToken(_pToken).rebase(pTokenAmount);
 
-    uint256 yTokenAmount = calcSwapForYTokens(amount).Y;
+    Constants.SwapForYTokensArgs memory args = calcSwapForYTokens(amount);
+    uint256 yTokenAmount = args.Y;
+    _epochLastSwapTimestamp[_currentEpochId.current()] = block.timestamp;
+    _epochLastSwapPrice[_currentEpochId.current()] = args.P_scaled;
+
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);

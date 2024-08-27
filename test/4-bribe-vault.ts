@@ -3,7 +3,7 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
-import { deployContractsFixture, ONE_DAY_IN_SECS } from './utils';
+import { deployContractsFixture, ONE_DAY_IN_SECS, expectedSwapForYTokens } from './utils';
 import { 
   Vault, RedeemPool, PToken, MockERC20,
   MockVault__factory, RedeemPool__factory, PToken__factory,
@@ -89,7 +89,7 @@ describe('Bribe Vault', () => {
     // 3 days later, Alice 'swap' 150 $iBGT for yiBGT. => $piBGT is rebased by 150/1500 = 10%
     await time.increase(ONE_DAY_IN_SECS * 3);
     let aliceSwapAmount = ethers.parseUnits("150", await iBGT.decimals());
-    let aliceExpectedYTokenAmount = aliceSwapAmount * 3600n;  // testing only
+    let aliceExpectedYTokenAmount = await expectedSwapForYTokens(iBGTVault, 150);
     await expect(iBGT.connect(Alice).approve(await iBGTVault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
     trans = await iBGTVault.connect(Alice).swapForYTokens(aliceSwapAmount);
     await expect(trans).to.changeTokenBalances(
