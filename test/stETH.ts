@@ -12,7 +12,7 @@ describe('stETH', () => {
 
     // Alice mint 100 $stETH to Bob
     let mintAmount = ethers.parseUnits('100', await stETH.decimals());
-    await expect(stETH.connect(Bob).mint(Bob.address, mintAmount)).to.be.rejectedWith('Caller is not admin');
+    await expect(stETH.connect(Bob).mint(Bob.address, mintAmount)).to.be.rejectedWith('Caller is not tester');
     await expect(stETH.connect(Alice).mint(Bob.address, mintAmount))
       .to.emit(stETH, 'Transfer').withArgs(ethers.ZeroAddress, Bob.address, mintAmount)
       .to.emit(stETH, 'TransferShares').withArgs(ethers.ZeroAddress, Bob.address, mintAmount);
@@ -29,9 +29,9 @@ describe('stETH', () => {
 
     // Bob add 150 $stETH as rewards. Not Bob and Caro's balance should be increaed by 50%
     const rewardAmount = ethers.parseUnits('150', await stETH.decimals());
-    await expect(stETH.connect(Bob).addRewards(rewardAmount)).to.be.rejectedWith('Caller is not admin');
-    await expect(stETH.connect(Alice).setAdmin(Bob.address, true))
-      .to.emit(stETH, 'UpdateAdmin').withArgs(Bob.address, true);
+    await expect(stETH.connect(Bob).addRewards(rewardAmount)).to.be.rejectedWith('Caller is not tester');
+    await expect(stETH.connect(Alice).setTester(Bob.address, true))
+      .to.emit(stETH, 'UpdateTester').withArgs(Bob.address, true);
     await expect(stETH.connect(Bob).addRewards(rewardAmount))
       .to.emit(stETH, 'AddRewards').withArgs(Bob.address, rewardAmount);
     

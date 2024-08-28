@@ -1,0 +1,43 @@
+{
+  "ZooProtocol": {
+    "address": "0x28fb8512e1cac919e10694bD5CCa8d88f36Ab202",
+    "args": []
+  },
+  "ProtocolSettings": {
+    "address": "0x853CeB293aaeAa8c378AA1357685b05A74c6B068",
+    "args": [
+      "0x28fb8512e1cac919e10694bD5CCa8d88f36Ab202",
+      "0xC73ce0c5e473E68058298D9163296BebAC2b729C"
+    ]
+  },
+  "MockERC20": {
+    "address": "0x09B94c564b6BFe7BBe828d173236084E49D933A8",
+    "args": [
+      "0x28fb8512e1cac919e10694bD5CCa8d88f36Ab202",
+      "Mocked iRED Token",
+      "iRED"
+    ]
+  },
+  "MockStakingPool": {
+    "address": "0x4FfcB8A2C4b0b4CC97Ff7D4A150a8c0F547a9961",
+    "args": [
+      "0x28fb8512e1cac919e10694bD5CCa8d88f36Ab202",
+      "0x09B94c564b6BFe7BBe828d173236084E49D933A8"
+    ]
+  },
+  "VaultCalculator": {
+    "address": "0xa84AF09c38a1Cd5F714303C138A30ba66D051F7f",
+    "args": []
+  },
+  "iRED_Vault": {
+    "address": "0x2e2DDCa8caA76Cc17f72275A7c61EAa3810CAA3c",
+    "args": [
+      "0x28fb8512e1cac919e10694bD5CCa8d88f36Ab202",
+      "0x853CeB293aaeAa8c378AA1357685b05A74c6B068",
+      "0x4FfcB8A2C4b0b4CC97Ff7D4A150a8c0F547a9961",
+      "0x09B94c564b6BFe7BBe828d173236084E49D933A8",
+      "Zoo piRED",
+      "piRED"
+    ]
+  }
+}

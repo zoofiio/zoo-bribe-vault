@@ -22,7 +22,7 @@ describe('Bribe Vault', () => {
     expect(await piBGT.decimals()).to.equal(await iBGT.decimals());
 
     // Create some dummy bribe token
-    const brbToken = await makeToken("Bribe Token", "BRB");
+    const brbToken = await makeToken(await protocol.getAddress(), "Bribe Token", "BRB");
     await expect(brbToken.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await brbToken.decimals()))).not.to.be.reverted;
     const bribeAmountBRB = ethers.parseUnits("2000", await brbToken.decimals());
 

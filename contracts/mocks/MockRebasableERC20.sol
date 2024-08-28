@@ -9,8 +9,9 @@ contract MockRebasableERC20 is MockERC20 {
   using SafeMath for uint256;
 
   constructor(
+    address _protocol,
     string memory name, string memory symbol
-  ) MockERC20(name, symbol) {
+  ) MockERC20(_protocol, name, symbol) {
     
   }
 
@@ -85,7 +86,7 @@ contract MockRebasableERC20 is MockERC20 {
     return true;
   }
 
-  function mint(address to, uint256 amount) public override nonReentrant onlyAdmin returns (bool) {
+  function mint(address to, uint256 amount) public override nonReentrant onlyTester returns (bool) {
     require(amount > 0, "Cannot mint 0");
 
     uint256 sharesAmount = getSharesByTokenAmount(amount);
@@ -127,14 +128,14 @@ contract MockRebasableERC20 is MockERC20 {
     revert("Unsupported");
   }
 
-  function addRewards(uint256 amount) external nonReentrant onlyAdmin {
+  function addRewards(uint256 amount) external nonReentrant onlyTester {
     require(amount > 0, "Cannot mint 0");
     _totalSupply = _totalSupply.add(amount);
 
     emit AddRewards(msg.sender, amount);
   }
 
-  function submitPenalties(uint256 amount) external nonReentrant onlyAdmin {
+  function submitPenalties(uint256 amount) external nonReentrant onlyTester {
     require(amount > 0, "Cannot burn 0");
     require(amount <= _totalSupply, "Cannot burn more than total supply");
     _totalSupply = _totalSupply.sub(amount);

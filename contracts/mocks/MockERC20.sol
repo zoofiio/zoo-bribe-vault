@@ -7,17 +7,20 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-contract MockERC20 is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
+import "../settings/ProtocolOwner.sol";
+
+contract MockERC20 is ERC20, ERC20Burnable, ProtocolOwner, ReentrancyGuard {
   using EnumerableSet for EnumerableSet.AddressSet;
 
-  EnumerableSet.AddressSet internal _admins;
+  EnumerableSet.AddressSet internal _testers;
   uint8 internal _decimals;
 
   constructor(
+    address _protocol,
     string memory name,
     string memory symbol
-  ) Ownable() ERC20(name, symbol) {
-    _setAdmin(_msgSender(), true);
+  ) ProtocolOwner(_protocol) ERC20(name, symbol) {
+    _setTester(owner(), true);
     _decimals = 18;
   }
 
@@ -27,17 +30,17 @@ contract MockERC20 is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
     return _decimals;
   }
 
-  function getAdminsCount() public view returns (uint256) {
-    return _admins.length();
+  function getTestersCount() public view returns (uint256) {
+    return _testers.length();
   }
 
-  function getAdmin(uint256 index) public view returns (address) {
-    require(index < _admins.length(), "Invalid index");
-    return _admins.at(index);
+  function getTester(uint256 index) public view returns (address) {
+    require(index < _testers.length(), "Invalid index");
+    return _testers.at(index);
   }
 
-  function isAdmin(address account) public view returns (bool) {
-    return _admins.contains(account);
+  function isTester(address account) public view returns (bool) {
+    return _testers.contains(account);
   }
 
   /* ================= MUTATIVE FUNCTIONS ================ */
@@ -46,40 +49,40 @@ contract MockERC20 is ERC20, ERC20Burnable, Ownable, ReentrancyGuard {
     _decimals = decimals_;
   }
 
-  function setAdmin(address account, bool minter) external nonReentrant onlyOwner {
-    _setAdmin(account, minter);
+  function setTester(address account, bool tester) external nonReentrant onlyOwner {
+    _setTester(account, tester);
   }
 
-  function mint(address to, uint256 value) public virtual nonReentrant onlyAdmin returns (bool) {
+  function mint(address to, uint256 value) public virtual nonReentrant onlyTester returns (bool) {
     _mint(to, value);
     return true;
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
-  function _setAdmin(address account, bool admin) internal {
+  function _setTester(address account, bool tester) internal {
     require(account != address(0), "Zero address detected");
 
-    if (admin) {
-      require(!_admins.contains(account), "Address is already admin");
-      _admins.add(account);
+    if (tester) {
+      require(!_testers.contains(account), "Address is already tester");
+      _testers.add(account);
     }
     else {
-      require(_admins.contains(account), "Address was not admin");
-      _admins.remove(account);
+      require(_testers.contains(account), "Address was not tester");
+      _testers.remove(account);
     }
 
-    emit UpdateAdmin(account, admin);
+    emit UpdateTester(account, tester);
   }
 
   /* ============== MODIFIERS =============== */
 
-  modifier onlyAdmin() {
-    require(isAdmin(_msgSender()), "Caller is not admin");
+  modifier onlyTester() {
+    require(isTester(_msgSender()), "Caller is not tester");
     _;
   }
 
   /* ========== EVENTS ========== */
 
-  event UpdateAdmin(address indexed account, bool admin);
+  event UpdateTester(address indexed account, bool tester);
 }

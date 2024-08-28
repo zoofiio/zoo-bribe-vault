@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "../settings/ProtocolOwner.sol";
+
 /**
  * @dev Updated from https://github.com/curvefi/multi-rewards/blob/master/contracts/MultiRewards.sol
  */
@@ -378,7 +380,7 @@ library SafeMath {
     }
 }
 
-contract MockStakingPool is ReentrancyGuard, Pausable {
+contract MockStakingPool is ReentrancyGuard, ProtocolOwner{
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -406,9 +408,9 @@ contract MockStakingPool is ReentrancyGuard, Pausable {
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
-        address _owner,
+        address _protocol,
         address _stakingToken
-    ) Owned(_owner) {
+    ) ProtocolOwner(_protocol) {
         stakingToken = IERC20(_stakingToken);
     }
 
@@ -468,7 +470,7 @@ contract MockStakingPool is ReentrancyGuard, Pausable {
         rewardData[_rewardsToken].rewardsDistributor = _rewardsDistributor;
     }
 
-    function stake(uint256 amount) external nonReentrant notPaused updateReward(msg.sender) {
+    function stake(uint256 amount) external nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         _totalSupply = _totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
@@ -527,7 +529,7 @@ contract MockStakingPool is ReentrancyGuard, Pausable {
     function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
         require(tokenAddress != address(stakingToken), "Cannot withdraw staking token");
         require(rewardData[tokenAddress].lastUpdateTime == 0, "Cannot withdraw reward token");
-        IERC20(tokenAddress).safeTransfer(owner, tokenAmount);
+        IERC20(tokenAddress).safeTransfer(owner(), tokenAmount);
         emit Recovered(tokenAddress, tokenAmount);
     }
 

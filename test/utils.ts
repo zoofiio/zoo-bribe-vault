@@ -40,15 +40,15 @@ export async function deployContractsFixture() {
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   // const MockERC20 = await MockERC20Factory.deploy("ERC20 Mock", "MockERC20");
   // const erc20 = MockERC20__factory.connect(await MockERC20.getAddress(), provider);
-  const iBGTToken = await MockERC20Factory.deploy("iBGT Token", "iBGT");
+  const iBGTToken = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT Token", "iBGT");
   const iBGT = MockERC20__factory.connect(await iBGTToken.getAddress(), provider);
 
   const MockRebasableERC20Factory = await ethers.getContractFactory("MockRebasableERC20");
-  const MockRebasableERC20 = await MockRebasableERC20Factory.deploy("Liquid staked Ether 2.0", "stETH");
+  const MockRebasableERC20 = await MockRebasableERC20Factory.deploy(await protocol.getAddress(),"Liquid staked Ether 2.0", "stETH");
   const stETH = MockRebasableERC20__factory.connect(await MockRebasableERC20.getAddress(), provider);
 
   const MockStakingPoolFactory = await ethers.getContractFactory("MockStakingPool");
-  const MockStakingPool = await MockStakingPoolFactory.deploy(await protocol.owner(), await iBGT.getAddress());
+  const MockStakingPool = await MockStakingPoolFactory.deploy(await protocol.getAddress(), await iBGT.getAddress());
   const stakingPool = MockStakingPool__factory.connect(await MockStakingPool.getAddress(), provider);
 
   const VaultCalculatorFactory = await ethers.getContractFactory("VaultCalculator");
@@ -127,9 +127,9 @@ export const getTime = async () => {
   return block!.timestamp;
 };
 
-export const makeToken = async (name: string, symbol: string, decimals: number = 18) => {
+export const makeToken = async (protocol: string, name: string, symbol: string, decimals: number = 18) => {
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-  const ERC20 = await MockERC20Factory.deploy(name, symbol);
+  const ERC20 = await MockERC20Factory.deploy(protocol, name, symbol);
   const erc20 = MockERC20__factory.connect(await ERC20.getAddress(), provider);
 
   const [Alice] = await ethers.getSigners();

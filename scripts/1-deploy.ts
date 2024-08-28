@@ -4,186 +4,25 @@ import { FactoryOptions } from "@nomicfoundation/hardhat-ethers/types";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract } from "./hutils";
+import {
+  MockERC20__factory,
+  ProtocolSettings__factory,
+  ZooProtocol__factory,
+  Vault__factory,
+  MockStakingPool__factory,
+} from "../typechain";
 
 dotenv.config();
 
 const treasuryAddress = '0xC73ce0c5e473E68058298D9163296BebAC2b729C';
-const ibgtPriceFeed = '';
 
-// https://docs.infrared.finance/testnet/deployments#contracts
-const vaults = [
-  {
-    assetsToken: "0x46eFC86F0D7455F135CC9df501673739d513E982",
-    assetsSymbol: "iBGT",
-    marginTokenName: "Zoo xiBGT",
-    marginTokenSymbol: "xiBGT",
-    chainlinkPriceFeed: ibgtPriceFeed,
-  },
-];
-
-const stableVaults: any[] = [
-  
-];
 let deployer: SignerWithAddress;
 
 const testers: any[] = [
-
+  "0x956Cd653e87269b5984B8e1D2884E1C0b1b94442",
+  "0xc97B447186c59A5Bb905cb193f15fC802eF3D543",
+  "0x1851CbB368C7c49B997064086dA94dBAD90eB9b5"
 ];
-
-
-async function deployValut(
-  vault: (typeof vaults)[0],
-  settingsAddress: string,
-  protocalAddress: string,
-  factoryOptions?: FactoryOptions
-) {
-  const priceFeedName = vault.assetsSymbol + "_PriceFeed";
-
-  let priceFeedAddress;
-  if (vault.chainlinkPriceFeed) {
-    priceFeedAddress = await deployContract("CommonPriceFeed", [vault.chainlinkPriceFeed], priceFeedName);
-  } 
-  else {
-    priceFeedAddress = await deployContract("MockPriceFeed", [], priceFeedName);
-    const mockPriceFeed = await ethers.getContractAt("MockPriceFeed", priceFeedAddress);
-    for (let i = 0; i < _.size(testers); i++) {
-      const tester = testers[i];
-      const isTester = await mockPriceFeed.isTester(tester);
-      if (isTester) {
-        console.log(`${priceFeedName}: ${tester} is already a tester`);
-      } else {
-        const trans = await mockPriceFeed.connect(deployer).setTester(tester, true);
-        await trans.wait();
-        console.log(`${priceFeedName}: ${tester} is now a tester`);
-      }
-    }
-  }
-
-  const marginTokenAddress = await deployContract(
-    "MarginToken",
-    [
-      protocalAddress,
-      settingsAddress,
-      vault.marginTokenName,
-      vault.marginTokenSymbol,
-    ],
-    `${vault.marginTokenSymbol}`
-  );
-
-  const marginToken = await ethers.getContractAt("MarginToken", marginTokenAddress);
-  const vaultAddress = await deployContract(
-    "Vault",
-    [
-      protocalAddress,
-      settingsAddress,
-      vault.assetsToken,
-      marginTokenAddress,
-      priceFeedAddress,
-    ],
-    vault.assetsSymbol + "_Vault",
-    factoryOptions
-  );
-  const Vault = await ethers.getContractAt("Vault", vaultAddress);
-  // below buy pool
-  const belowPoolAddress = await deployContract(
-    "PtyPoolBuyLow",
-    [
-      protocalAddress,
-      settingsAddress,
-      vaultAddress,
-      marginTokenAddress,
-      vault.assetsToken,
-    ],
-    `${vault.assetsSymbol}_PtyPoolBuyLow`
-  );
-  // above sell pool
-  const abovePoolAddress = await deployContract(
-    "PtyPoolSellHigh",
-    [
-      protocalAddress,
-      settingsAddress,
-      vaultAddress,
-      vault.assetsToken,
-      marginTokenAddress,
-    ],
-    `${vault.assetsSymbol}_PtyPoolSellHigh`
-  );
-
-  // setPtyPools
-  let trans = await Vault.connect(deployer).setPtyPools(belowPoolAddress, abovePoolAddress);
-  await trans.wait();
-  console.log(`Set ${vault.assetsSymbol} Vault PtyPools`);
-
-  // marginToken setVault
-  trans = await marginToken.connect(deployer).setVault(vaultAddress);
-  await trans.wait();
-  console.log(`Connect margin token to ${vault.assetsSymbol} Vault`);
-
-  return vaultAddress;
-}
-
-async function deployStableValut(
-  vault: (typeof stableVaults)[0],
-  settingsAddress: string,
-  protocalAddress: string,
-  factoryOptions?: FactoryOptions
-) {
-  const priceFeedName = vault.assetsSymbol + "_PriceFeed";
-
-  let priceFeedAddress;
-  if (vault.chainlinkPriceFeed) {
-    priceFeedAddress = await deployContract(
-      "CommonPriceFeed",
-      [vault.chainlinkPriceFeed],
-      priceFeedName
-    );
-  }
-  else {
-    priceFeedAddress = await deployContract("MockPriceFeed", [], priceFeedName);
-    const mockPriceFeed = await ethers.getContractAt("MockPriceFeed", priceFeedAddress);
-    for (let i = 0; i < _.size(testers); i++) {
-      const tester = testers[i];
-      const isTester = await mockPriceFeed.isTester(tester);
-      if (isTester) {
-        console.log(`${priceFeedName}: ${tester} is already a tester`);
-      } else {
-        const trans = await mockPriceFeed.connect(deployer).setTester(tester, true);
-        await trans.wait();
-        console.log(`${priceFeedName}: ${tester} is now a tester`);
-      }
-    }
-  }
-
-  const marginTokenAddress = await deployContract(
-    "MarginToken",
-    [
-      protocalAddress,
-      settingsAddress,
-      vault.marginTokenName,
-      vault.marginTokenSymbol,
-    ],
-    `${vault.marginTokenSymbol}`
-  );
-  const marginToken = await ethers.getContractAt("MarginToken", marginTokenAddress);
-  const vaultAddress = await deployContract(
-    "StableVault",
-    [
-      protocalAddress,
-      settingsAddress,
-      vault.assetsToken,
-      marginTokenAddress,
-      priceFeedAddress,
-    ],
-    vault.assetsSymbol + "_StableVault",
-    factoryOptions
-  );
-
-  let trans = await marginToken.connect(deployer).setVault(vaultAddress);
-  await trans.wait();
-  console.log(`Connect margin token to ${vault.assetsSymbol} Vault`);
-
-  return vaultAddress;
-}
 
 async function main() {
   const signers = await ethers.getSigners();
@@ -191,70 +30,41 @@ async function main() {
   const nonce = await deployer.getNonce();
   console.log("nonce:", nonce);
 
-  // Deploy Protocol
-  const protocalAddress = await deployContract("ZooProtocol", []);
-  const protocol = await ethers.getContractAt("ZooProtocol", protocalAddress);
+  const protocolAddress = await deployContract("ZooProtocol", []);
+  const protocol = ZooProtocol__factory.connect(await protocolAddress, deployer);
 
-  //  Deploy Protocol core contracts
-  const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocalAddress, treasuryAddress]);
-  const settings = await ethers.getContractAt("ProtocolSettings", protocolSettingsAddress);
+  const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
+  const settings = ProtocolSettings__factory.connect(await protocolSettingsAddress, deployer);
 
-  // Deploy Usd
-  const usdAddress = await deployContract("Usd", [protocalAddress, await settings.getAddress()]);
-  const Usd = await ethers.getContractAt("Usd", usdAddress);
-
-  // initProtocal Usd
-  if (!(await protocol.initialized())) {
-    await protocol
-      .connect(deployer)
-      .initialize(await Usd.getAddress())
-      .then((tx) => tx.wait(1));
+  // Deploy mocked iRED
+  const iREDAddress = await deployContract("MockERC20", [protocolAddress, "Mocked iRED Token", "iRED"]);
+  const iRED = MockERC20__factory.connect(iREDAddress, deployer);
+  for (let i = 0; i < _.size(testers); i++) { 
+    const trans = await iRED.connect(deployer).setTester(testers[i], true);
+    await trans.wait();
+    console.log(`${await iRED.symbol()}: ${testers[i]} is now a tester`);
   }
-  console.log(`Initialized ZooProtocol with $zUSD token`);
+
+  // Deploy mocked iRED staking pool
+  const stakingPoolAddress = await deployContract("MockStakingPool", [protocolAddress, iREDAddress]);
+  const stakingPool = MockStakingPool__factory.connect(stakingPoolAddress, deployer);
 
   const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
-  for (const vc of vaults) {
-    const ethVaultAddress = await deployValut(vc, protocolSettingsAddress, protocalAddress, {
-      libraries: {
-        VaultCalculator: vaultCalculatorAddress,
-      },
-    });
-    // protocal Add Vault
-    if (!(await protocol.isVault(ethVaultAddress)))
-      await protocol
-        .connect(deployer)
-        .addVault(ethVaultAddress)
-        .then((tx) => tx.wait(1));
-  }
 
-  const stableVaultCalculatorAddress = await deployContract("StableVaultCalculator", []);
-  for (const vc of stableVaults) {
-    const usdbVaultAddress = await deployStableValut(vc, protocolSettingsAddress, protocalAddress, {
-      libraries: {
-        StableVaultCalculator: stableVaultCalculatorAddress,
-      },
-    });
-    // protocal Add Vault
-    if (!(await protocol.isVault(usdbVaultAddress)))
-      await protocol
-        .connect(deployer)
-        .addVault(usdbVaultAddress)
-        .then((tx) => tx.wait(1));
-
-    // set Y to 2.0%
-    await settings.connect(deployer).updateVaultParamValue(usdbVaultAddress, ethers.encodeBytes32String("Y"), 2 * 10 ** 8);
-    console.log(`Set USDB vault Y to 2.0%`);
-
-    // set AARS to 115%
-    await settings.connect(deployer).updateVaultParamValue(usdbVaultAddress, ethers.encodeBytes32String("AARS"), 115 * 10 ** 8);
-    console.log(`Set USDB vault AARS to 115%`);
-  }
-  await deployContract("VaultQuery", [], "VaultQuery", {
+  const vaultAddress = await deployContract("Vault", [
+    protocolAddress, protocolSettingsAddress, stakingPoolAddress,
+    iREDAddress, "Zoo piRED", "piRED"
+  ], "iRED_Vault", {
     libraries: {
       VaultCalculator: vaultCalculatorAddress,
-      StableVaultCalculator: stableVaultCalculatorAddress,
-    },
+    }
   });
+
+  const iREDVault = Vault__factory.connect(vaultAddress, deployer);
+
+  let trans = await protocol.connect(deployer).addVault(vaultAddress);
+  await trans.wait();
+  console.log("Added iRED vault to protocol");
 }
 
 // We recommend this pattern to be able to use async/await everywhere

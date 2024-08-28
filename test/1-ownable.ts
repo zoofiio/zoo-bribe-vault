@@ -57,7 +57,7 @@ describe("Ownable", () => {
 
     // Create vault. Any one could deploy a Vault, but only protocol owner could register it to protocol
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-    const MockERC20 = await MockERC20Factory.deploy("Dummy Token", "DMY");
+    const MockERC20 = await MockERC20Factory.deploy(await protocol.getAddress(), "Dummy Token", "DMY");
     const dummyToken = MockERC20__factory.connect(await MockERC20.getAddress(), provider);
     const VaultFactory = await ethers.getContractFactory("Vault", {
       libraries: {
