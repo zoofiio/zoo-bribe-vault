@@ -67,6 +67,22 @@ contract MockVault is IVault {
     return 0;
   }
 
+  function yTokenTotalSupplySynthetic(uint256) public pure returns (uint256) {
+    return 0;
+  }
+
+  function yTokenUserBalanceSynthetic(uint256, address) public pure returns (uint256) {
+    return 0;
+  }
+
+  function bribeTokens(uint256) public pure returns (address[] memory) {
+    return new address[](0);
+  }
+
+  function bribeTotalAmount(uint256, address) public pure returns (uint256) {
+    return 0;
+  }
+
   function epochLastSwapTimestamp(uint256) public pure returns (uint256) {
     return 0;
   }

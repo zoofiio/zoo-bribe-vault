@@ -428,6 +428,10 @@ contract MockStakingPool is ReentrancyGuard, Pausable {
 
     /* ========== VIEWS ========== */
 
+    function rewardTokensLength() external view returns (uint256) {
+        return rewardTokens.length;
+    }
+
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
     }

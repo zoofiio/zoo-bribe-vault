@@ -225,17 +225,12 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
   if (useFloorPrice) {
     /**
      * a1 = P_floor / (
-     *    (1 + e1 * (M - S) / M) - deltaT / (
-     *        T * (1 + (M - S) / (e2 * M))
-     *    )
+     *    (1 + e1 * (M - S) / M) 
      * )
      */
     a = P_floor_scaled / (
-      (1 + e1 * (M - S) / M) - deltaT / (
-        T * (1 + (M - S) / (e2 * M))
-      )
+      (1 + e1 * (M - S) / M) 
     );
-    if (a < 0) a = -a;  // ?
     console.log(`expectedSwapForYTokens, useFloorPrice, a: ${a}`);
   }
 
@@ -263,5 +258,5 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
   const Y = (B + Math.sqrt(B * B + 4 * A * C)) / (2 * A);
   console.log(`expectedSwapForYTokens, Y: ${Y}`);
 
-  
+  return Y;
 }

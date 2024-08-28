@@ -21,6 +21,14 @@ interface IVault {
 
   function yTokenUserBalance(uint256 epochId, address user) external view returns (uint256);
 
+  function yTokenTotalSupplySynthetic(uint256 epochId) external view returns (uint256);
+
+  function yTokenUserBalanceSynthetic(uint256 epochId, address user) external view returns (uint256);
+
+  function bribeTokens(uint256 epochId) external view returns (address[] memory);
+
+  function bribeTotalAmount(uint256 epochId, address bribeToken) external view returns (uint256);
+
   function epochLastSwapTimestamp(uint256 epochId) external view returns (uint256);
 
   function epochLastSwapPriceScaled(uint256 epochId) external view returns (uint256);

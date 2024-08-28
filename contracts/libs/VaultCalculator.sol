@@ -5,19 +5,21 @@ import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./Constants.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IVault.sol";
 
 library VaultCalculator {
+  using EnumerableSet for EnumerableSet.AddressSet;
   using SafeMath for uint256;
 
   uint256 public constant SCALE = 10 ** 18;
 
-  function doCalcSwapForYTokens(IVault self, uint256 assetAmount) public view returns (Constants.SwapForYTokensArgs memory) {
+  function doCalcSwapForYTokens(IVault self, uint256 assetAmount) public view returns (Constants.SwapForYTokensResult memory) {
     uint256 epochId = self.currentEpochId();  // require epochId > 0
 
-    Constants.SwapForYTokensArgs memory args;
+    Constants.SwapForYTokensResult memory args;
 
     bool firstEpochSwap = true;
     uint256 epochLastSwapPriceScaled = 0;
@@ -120,12 +122,10 @@ library VaultCalculator {
     if (useFloorPrice) {
       /**
        * a1 = P_floor / (
-       *    (1 + e1 * (M - S) / M) - deltaT / (
-       *        T * (1 + (M - S) / (e2 * M))
-       *    )
+       *    (1 + e1 * (M - S) / M) 
        * )
        */
-      args.a_scaled = args.P_floor_scaled.mul(SCALE).div(T.T3);  // scale: 10 ** (10 + 18)
+      args.a_scaled = args.P_floor_scaled.mul(SCALE).div(SCALE.add(T.T1));  // scale: 10 ** (10 + 18)
       console.log("doCalcSwapForYTokens, useFloorPrice, a_scaled: %s", args.a_scaled);
     }
 
@@ -162,6 +162,29 @@ library VaultCalculator {
     console.log("doCalcSwapForYTokens, Y: %s", args.Y);
 
     return args;
+  }
+
+  function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  
+    Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    uint256 epochEndTime = epoch.startTime.add(epoch.duration);
+    require(block.timestamp > epochEndTime, "Epoch not ended yet");
+
+    uint256 yTokenBalanceSynthetic = self.yTokenUserBalanceSynthetic(epochId, account);
+    uint256 yTokenTotalSynthetic = self.yTokenTotalSupplySynthetic(epochId);
+    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
+
+    address[] memory epochBribeTokens = self.bribeTokens(epochId);
+    Constants.BribeInfo[] memory bribeInfo = new Constants.BribeInfo[](epochBribeTokens.length);
+    for (uint i; i < epochBribeTokens.length; i++) {
+      address bribeToken = epochBribeTokens[i];
+      uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
+      uint256 bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic);
+      bribeInfo[i].epochId = epochId;
+      bribeInfo[i].bribeToken = bribeToken;
+      bribeInfo[i].bribeAmount = bribes;
+    }
+
+    return bribeInfo;
   }
 
 }
