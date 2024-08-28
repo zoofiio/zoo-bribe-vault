@@ -69,11 +69,11 @@ const config: HardhatUserConfig = {
             enabled: true,
             runs: 100,
             // https://hardhat.org/hardhat-runner/docs/reference/solidity-support#support-for-ir-based-codegen
-            details: {
-              yulDetails: {
-                optimizerSteps: "u",
-              },
-            },
+            // details: {
+            //   yulDetails: {
+            //     optimizerSteps: "u",
+            //   },
+            // },
           },
           viaIR: true
         },

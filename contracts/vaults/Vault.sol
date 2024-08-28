@@ -139,7 +139,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   function bribeTokens(uint256 epochId) public view validEpochId(epochId) returns (address[] memory) {
     EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
     address[] memory tokens = new address[](epochBribeTokens.length());
-    for (uint i; i < epochBribeTokens.length(); i++) {
+    for (uint256 i = 0; i < epochBribeTokens.length(); i++) {
       tokens[i] = epochBribeTokens.at(i);
     }
     return tokens;
@@ -230,7 +230,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit YTokenDummyBurned(epochId, _msgSender(), yTokenBalanceSynthetic);
 
     Constants.BribeInfo[] memory bribeInfo = calcBribes(epochId, _msgSender());
-    for (uint i; i < bribeInfo.length; i++) {
+    for (uint256 i = 0; i < bribeInfo.length; i++) {
       Constants.BribeInfo memory info = bribeInfo[i];
       if (info.bribeAmount > 0) {
         _bribeTotalAmount[info.epochId][info.bribeToken] = _bribeTotalAmount[info.epochId][info.bribeToken].sub(info.bribeAmount);
@@ -284,6 +284,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   /* ========== INTERNAL FUNCTIONS ========== */
 
   function _onEndEpoch(uint256 epochId) internal {
+    console.log("_onEndEpoch, end epoch %s", epochId);
     Constants.Epoch memory epoch = _epochs[epochId];
 
     RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
@@ -330,7 +331,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     }
 
     uint256[] memory previousBribeTokenBalance = new uint256[](rewardTokens.length);
-    for (uint i; i < rewardTokens.length; i++) {
+    for (uint256 i = 0; i < rewardTokens.length; i++) {
       address bribeToken = rewardTokens[i];
       bool added = epochBribeTokens.add(bribeToken);
       if (added) {
@@ -342,10 +343,12 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     stakingPool.getReward();
 
     mapping(address => uint256) storage epochBribeTotalAmount = _bribeTotalAmount[epochId];
-    for (uint i; i < rewardTokens.length; i++) {
+    for (uint256 i = 0; i < rewardTokens.length; i++) {
       address bribeToken = rewardTokens[i];
       uint256 newBribeTokenBalance = IERC20(bribeToken).balanceOf(address(this));
       epochBribeTotalAmount[bribeToken] = epochBribeTotalAmount[bribeToken].add(newBribeTokenBalance.sub(previousBribeTokenBalance[i]));
+      
+      console.log("epoch: %s, bribeToken: %s, total bribe amount: %s", epochId, bribeToken, epochBribeTotalAmount[bribeToken]);
     }
   }
 

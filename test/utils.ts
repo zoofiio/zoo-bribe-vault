@@ -156,7 +156,7 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
     M = Number(formatUnits(await vault.yTokenTotalSupply(epochId), yTokenDecimals));
     S = Number(formatUnits(await vault.yTokenUserBalance(epochId, await vault.getAddress()), yTokenDecimals));
     t0 = epoch.startTime;
-    console.log(`expectedSwapForYTokens, M: ${M}, S: ${S}, t0: ${t0}`);
+    console.log(`expectedSwapForYTokens, current epoch, M: ${M}, S: ${S}, t0: ${t0}`);
 
     if (await vault.epochLastSwapTimestamp(epochId) > 0) {
       deltaT = (await time.latest()) - Number(await vault.epochLastSwapTimestamp(epochId));
@@ -166,6 +166,7 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
       deltaT = (await time.latest()) - Number(epoch.startTime);
     }
     epochEndTime = Number(epoch.startTime + epoch.duration);
+    console.log(`expectedSwapForYTokens, current epoch, deltaT: ${deltaT}`);
   }
   else {
     // in a new epoch
@@ -195,15 +196,15 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
   else {
     // a = P / (1 + e1 * (M - S) / M)
     if (epochLastSwapPriceScaled <= 0) { console.log("Invalid last epoch swap price"); return -1; }
-    a = epochLastSwapPriceScaled / (
+    a = epochLastSwapPriceScaled / (10 ** 28) / (
       1 + e1 * (M - S) / M
     );
     console.log(`expectedSwapForYTokens, not first swap of epoch, a: ${a}`);
   }
 
-  // P(L(t)) = APRl * (D - t) / 365
+  // P(L(t)) = APRl * (ED - t) / 365
   APRl = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRl")), SETTINGS_DECIMALS));
-  const P_floor_scaled = APRl * (D - deltaT) / (365 * ONE_DAY_IN_SECS);
+  const P_floor_scaled = APRl * (epochEndTime - t) / (365 * ONE_DAY_IN_SECS);
   console.log(`expectedSwapForYTokens, APRl: ${APRl}, P_floor_scaled: ${P_floor_scaled}`);
 
   /**

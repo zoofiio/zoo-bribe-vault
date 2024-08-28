@@ -32,7 +32,7 @@ library VaultCalculator {
       args.M = self.yTokenTotalSupply(epochId);
       args.S = self.yTokenUserBalance(epochId, address(this));
       args.t0 = epoch.startTime;
-      console.log("doCalcSwapForYTokens, M: %s, S: %s, t0: %s", args.M, args.S, args.t0);
+      console.log("doCalcSwapForYTokens, current epoch, M: %s, S: %s, t0: %s", args.M, args.S, args.t0);
 
       if (self.epochLastSwapTimestamp(epochId) > 0) {
         args.deltaT = block.timestamp.sub(self.epochLastSwapTimestamp(epochId));
@@ -42,6 +42,7 @@ library VaultCalculator {
         args.deltaT = block.timestamp.sub(epoch.startTime);
       }
       epochEndTime = epoch.startTime.add(epoch.duration);
+      console.log("doCalcSwapForYTokens, current epoch, deltaT: %s", args.deltaT);
     } 
     else {
       // in a new epoch
@@ -130,7 +131,7 @@ library VaultCalculator {
     }
 
     // A = a / M
-    args.A = args.a_scaled.div(args.M);  // scale: 10 ** (10 + 18)
+    args.A = args.a_scaled.mul(10**6).div(args.M);  // scale: 10 ** (10 + 18 + 6)
     console.log("doCalcSwapForYTokens, A: %s", args.A);
 
     /**
@@ -138,17 +139,17 @@ library VaultCalculator {
      *    T * (1 + (M - S) / (e2 * M))
      * ) - a - e1 * a
      */
-    args.B = args.a_scaled.mul(args.deltaT).mul(SCALE).div(
+    args.B = args.a_scaled.mul(args.deltaT).mul(SCALE).mul(10**6).div(
       args.T.mul(
         SCALE.add(
           args.M.sub(args.S).mul(SCALE).div(args.e2.mul(args.M))
         )
       )
-    ).sub(args.a_scaled).sub(args.e1.mul(args.a_scaled));   // scale: 10 ** (10 + 18)
+    ).sub(args.a_scaled.mul(10**6)).sub(args.e1.mul(args.a_scaled).mul(10**6));   // scale: 10 ** (10 + 18 + 6)
     console.log("doCalcSwapForYTokens, B: %s", args.B);
 
     // C = X
-    args.C = assetAmount.mul(10 ** Constants.PROTOCOL_DECIMALS).mul(SCALE);    // scale: 10 ** (10 + 18)
+    args.C = assetAmount.mul(10 ** Constants.PROTOCOL_DECIMALS).mul(SCALE).mul(10**6);    // scale: 10 ** (10 + 18 + 6)
     console.log("doCalcSwapForYTokens, C: %s", args.C);
 
     /**
@@ -175,7 +176,7 @@ library VaultCalculator {
 
     address[] memory epochBribeTokens = self.bribeTokens(epochId);
     Constants.BribeInfo[] memory bribeInfo = new Constants.BribeInfo[](epochBribeTokens.length);
-    for (uint i; i < epochBribeTokens.length; i++) {
+    for (uint256 i = 0; i < epochBribeTokens.length; i++) {
       address bribeToken = epochBribeTokens[i];
       uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
       uint256 bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic);
