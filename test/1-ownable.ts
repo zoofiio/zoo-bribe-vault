@@ -99,7 +99,7 @@ describe("Ownable", () => {
     expect(await settings.paramConfig(encodeBytes32String("C"))).to.deep.equal([5n * 10n ** 8n, 1n * 10n ** 8n, 10n ** 10n], "Param C is updated");
     expect(await settings.vaultParamValue(await dummyVault.getAddress(), encodeBytes32String("C"))).to.equal(2 * 10 ** 8, "Vault param C is updated");
    
-    // Only admin could update primary token's name and symbol
+    // Only admin could update principal token's name and symbol
     await expect(piBGT.connect(Bob).setName("Dummy Primary Token V2")).to.be.revertedWith("Ownable: caller is not the owner");
     await expect(piBGT.connect(Bob).setSymbol("DmyPT2")).to.be.revertedWith("Ownable: caller is not the owner");
     await expect(piBGT.connect(Alice).setName("Dummy Primary Token V2")).not.to.be.reverted;

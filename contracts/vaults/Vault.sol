@@ -161,8 +161,12 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochLastSwapPrice[epochId];
   }
 
-  function calcSwapForYTokens(uint256 assetAmount) public view returns (Constants.SwapForYTokensResult memory) {
-    return IVault(this).doCalcSwapForYTokens(assetAmount);
+  function calcSwapResult(uint256 assetAmount) public view returns (Constants.SwapResult memory) {
+    return IVault(this).doCalcSwapX2Y(assetAmount);
+  }
+
+  function calcSwapResultWithExpectedYTokenAmount(uint256 expectedYTokenAmount) public view returns (Constants.SwapResult memory) {
+    return IVault(this).doCalcSwapY2X(expectedYTokenAmount);
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
@@ -193,8 +197,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
-  function swapForYTokens(uint256 amount) external nonReentrant whenSwapNotPaused noneZeroAmount(amount) onUserAction {
-    require(IERC20(_pToken).totalSupply() > 0, "No primary token minted yet");
+  function swap(uint256 amount) external nonReentrant whenSwapNotPaused noneZeroAmount(amount) onUserAction {
+    require(IERC20(_pToken).totalSupply() > 0, "No principal token minted yet");
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
@@ -202,18 +206,18 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 pTokenAmount = amount;
     IPToken(_pToken).rebase(pTokenAmount);
 
-    Constants.SwapForYTokensResult memory args = calcSwapForYTokens(amount);
+    Constants.SwapResult memory args = calcSwapResult(amount);
     uint256 yTokenAmount = args.Y;
     _epochLastSwapTimestamp[_currentEpochId.current()] = block.timestamp;
     _epochLastSwapPrice[_currentEpochId.current()] = args.P_scaled;
 
-    _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
+    require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yToken balance");
+    _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].sub(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
-    emit YTokenDummyMinted(_currentEpochId.current(), _msgSender(), amount, yTokenAmount);
 
     Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
     uint256 yTokenAmountSynthetic = yTokenAmount.mul(epoch.startTime.add(epoch.duration).sub(block.timestamp));
-    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
+    _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].sub(yTokenAmountSynthetic);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()].add(yTokenAmountSynthetic);
 
     emit Swap(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);

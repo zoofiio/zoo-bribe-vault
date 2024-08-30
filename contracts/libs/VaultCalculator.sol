@@ -16,23 +16,23 @@ library VaultCalculator {
 
   uint256 public constant SCALE = 10 ** 18;
 
-  function doCalcSwapForYTokens(IVault self, uint256 assetAmount) public view returns (Constants.SwapForYTokensResult memory) {
+  function doCalcSwapCommon(IVault self) public view returns (Constants.SwapResult memory) {
     uint256 epochId = self.currentEpochId();  // require epochId > 0
 
-    Constants.SwapForYTokensResult memory args;
+    Constants.SwapResult memory args;
 
     bool firstEpochSwap = true;
     uint256 epochLastSwapPriceScaled = 0;
     uint256 epochEndTime = 0;
     args.D = self.paramValue("D");
-    console.log("doCalcSwapForYTokens, D: %s", args.D);
+    console.log("doCalcSwapCommon, D: %s", args.D);
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
       // in current epoch
       args.M = self.yTokenTotalSupply(epochId);
       args.S = self.yTokenUserBalance(epochId, address(this));
       args.t0 = epoch.startTime;
-      console.log("doCalcSwapForYTokens, current epoch, M: %s, S: %s, t0: %s", args.M, args.S, args.t0);
+      console.log("doCalcSwapCommon, current epoch, M: %s, S: %s, t0: %s", args.M, args.S, args.t0);
 
       if (self.epochLastSwapTimestamp(epochId) > 0) {
         args.deltaT = block.timestamp.sub(self.epochLastSwapTimestamp(epochId));
@@ -42,7 +42,7 @@ library VaultCalculator {
         args.deltaT = block.timestamp.sub(epoch.startTime);
       }
       epochEndTime = epoch.startTime.add(epoch.duration);
-      console.log("doCalcSwapForYTokens, current epoch, deltaT: %s", args.deltaT);
+      console.log("doCalcSwapCommon, current epoch, deltaT: %s", args.deltaT);
     } 
     else {
       // in a new epoch
@@ -52,21 +52,21 @@ library VaultCalculator {
       args.deltaT = 0;
       epochEndTime = block.timestamp.add(args.D);
 
-      console.log("doCalcSwapForYTokens, new epoch, M: %s, S: %s, t0: %s, deltaT: 0", args.M, args.S, args.t0);
+      console.log("doCalcSwapCommon, new epoch, M: %s, S: %s, t0: %s, deltaT: 0", args.M, args.S, args.t0);
     }
     
     args.T = self.paramValue("T");
     args.t = block.timestamp;
     args.e1 = self.paramValue("e1");
     args.e2 = self.paramValue("e2");
-    console.log("doCalcSwapForYTokens, T: %s, t: %s", args.T, args.t);
-    console.log("doCalcSwapForYTokens, e1: %s, e2: %s", args.e1, args.e2);
+    console.log("doCalcSwapCommon, T: %s, t: %s", args.T, args.t);
+    console.log("doCalcSwapCommon, e1: %s, e2: %s", args.e1, args.e2);
 
     if (firstEpochSwap) {
       // a = APRi * D / 365
       args.APRi = self.paramValue("APRi");
       args.a_scaled = args.APRi.mul(SCALE).mul(args.D).div(365 days);   // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapForYTokens, first swap of epoch, args.APRi: %s, a_scaled: %s", args.APRi, args.a_scaled);
+      console.log("doCalcSwapCommon, first swap of epoch, args.APRi: %s, a_scaled: %s", args.APRi, args.a_scaled);
     }
     else {
       // a = P / (1 + e1 * (M - S) / M)
@@ -76,13 +76,13 @@ library VaultCalculator {
           args.e1.mul(args.M.sub(args.S)).mul(SCALE).div(args.M)
         )
       );  // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapForYTokens, not first swap of epoch, a_scaled: %s", args.a_scaled);
+      console.log("doCalcSwapCommon, not first swap of epoch, a_scaled: %s", args.a_scaled);
     }
 
     // P(L(t)) = APRl * (D - t) / 365
     args.APRl = self.paramValue("APRl");
     args.P_floor_scaled = args.APRl.mul(SCALE).mul(epochEndTime.sub(args.t)).div(365 days);   // scale: 10 ** (10 + 18)
-    console.log("doCalcSwapForYTokens, APRl: %s, P_floor_scaled: %s", args.APRl, args.P_floor_scaled);
+    console.log("doCalcSwapCommon, APRl: %s, P_floor_scaled: %s", args.APRl, args.P_floor_scaled);
 
     /**
      * P(S,t) = a * (
@@ -109,7 +109,7 @@ library VaultCalculator {
       )
     );   // scale: 10 ** 18
     args.P_scaled_positive = T.T1 > T.T2;
-    console.log("doCalcSwapForYTokens, T1: %s, T2: %s, P_scaled_positive: %s", T.T1, T.T2, args.P_scaled_positive);
+    console.log("doCalcSwapCommon, T1: %s, T2: %s, P_scaled_positive: %s", T.T1, T.T2, args.P_scaled_positive);
     
     if (args.P_scaled_positive) {
       T.T3 = SCALE.add(T.T1).sub(T.T2);   // scale: 10 ** 18
@@ -117,7 +117,7 @@ library VaultCalculator {
       T.T3 = T.T2.sub(T.T1).sub(SCALE);   // scale: 10 ** 18
     }
     args.P_scaled = args.a_scaled.mul(T.T3).div(SCALE);   // scale: 10 ** (10 + 18)
-    console.log("doCalcSwapForYTokens, P_scaled: %s", args.P_scaled);
+    console.log("doCalcSwapCommon, P_scaled: %s", args.P_scaled);
 
     bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
     if (useFloorPrice) {
@@ -127,12 +127,12 @@ library VaultCalculator {
        * )
        */
       args.a_scaled = args.P_floor_scaled.mul(SCALE).div(SCALE.add(T.T1));  // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapForYTokens, useFloorPrice, a_scaled: %s", args.a_scaled);
+      console.log("doCalcSwapCommon, useFloorPrice, a_scaled: %s", args.a_scaled);
     }
 
     // A = a / M
     args.A = args.a_scaled.mul(10**6).div(args.M);  // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapForYTokens, A: %s", args.A);
+    console.log("doCalcSwapCommon, A: %s", args.A);
 
     /**
      * B = a * deltaT / (
@@ -146,11 +146,47 @@ library VaultCalculator {
         )
       )
     ).sub(args.a_scaled.mul(10**6)).sub(args.e1.mul(args.a_scaled).mul(10**6));   // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapForYTokens, B: %s", args.B);
+    console.log("doCalcSwapCommon, B: %s", args.B);
+
+    return args;
+  }
+
+  function doCalcSwapY2X(IVault self, uint256 expectedYTokens) public view returns (Constants.SwapResult memory) {
+    Constants.SwapResult memory args = doCalcSwapCommon(self);
+
+    args.Y = expectedYTokens;
+
+    /**
+     * X = a * Y - a * deltaT * Y / (
+     *  T * (1 + (M - S) / (e2 * M))
+     * ) + e1 * a / M * (M * Y - Y^2 / 2)
+     */
+    Constants.Terms memory T;
+    T.T1 = args.a_scaled.mul(args.Y);
+    T.T2 = args.a_scaled.mul(args.deltaT).mul(args.Y).mul(SCALE);
+    T.T3 = args.T.mul(
+      SCALE.add(
+        args.M.sub(args.S).mul(SCALE).div(args.e2.mul(args.M))
+      )
+    );
+    T.T4 = args.e1.mul(args.a_scaled).mul(
+      args.M.mul(args.Y).sub(args.Y.mul(args.Y).div(2))
+    ).div(args.M);
+    
+    args.X = T.T1.sub(
+      T.T2.div(T.T3)
+    ).add(T.T4).div(SCALE).div(10 ** Constants.PROTOCOL_DECIMALS);
+
+    return args;
+  }
+
+  function doCalcSwapX2Y(IVault self, uint256 assetAmount) public view returns (Constants.SwapResult memory) {
+    Constants.SwapResult memory args = doCalcSwapCommon(self);
 
     // C = X
+    args.X = assetAmount;
     args.C = assetAmount.mul(10 ** Constants.PROTOCOL_DECIMALS).mul(SCALE).mul(10**6);    // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapForYTokens, C: %s", args.C);
+    console.log("doCalcSwapX2Y, C: %s", args.C);
 
     /**
      * Y(X) = (B + sqrt(B * B + 4 * A * C)) / (2 * A)
@@ -160,7 +196,7 @@ library VaultCalculator {
         args.B.mul(args.B).add(args.A.mul(4).mul(args.C))
       )
     ).div(args.A.mul(2));
-    console.log("doCalcSwapForYTokens, Y: %s", args.Y);
+    console.log("doCalcSwapX2Y, Y: %s", args.Y);
 
     return args;
   }

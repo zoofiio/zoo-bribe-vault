@@ -38,7 +38,7 @@ describe('Bribe Vault', () => {
     await expect(iBGTVault.epochInfoById(0)).to.be.revertedWith("Invalid epoch id");
 
     // Could not swap before any deposits
-    await expect(iBGTVault.connect(Alice).swapForYTokens(100)).to.be.revertedWith("No primary token minted yet");
+    await expect(iBGTVault.connect(Alice).swap(100)).to.be.revertedWith("No principal token minted yet");
 
     // First deposit automaticaly starts a new epoch.
     // Alice deposits 1000 $iBGT, Bob deposits 500 $iBGT
@@ -94,12 +94,12 @@ describe('Bribe Vault', () => {
     //   Alice 1000 $iBGT; Bob 500 $iBGT
     // 3 days later, Alice 'swap' 150 $iBGT for yiBGT. => $piBGT is rebased by 150/1500 = 10%
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
-    let aliceSwapAmount = ethers.parseUnits("150", await iBGT.decimals());
-    let aliceExpectedYTokenAmount = await expectedSwapForYTokens(iBGTVault, 150);  // 11699.3876024
-    let aliceActualSwapForYTokenResult = await iBGTVault.calcSwapForYTokens(aliceSwapAmount);
+    let aliceSwapAmount = ethers.parseUnits("1", await iBGT.decimals());
+    let aliceExpectedYTokenAmount = await expectedSwapForYTokens(iBGTVault, 1);  // 955.248658753
+    let aliceActualSwapForYTokenResult = await iBGTVault.calcSwapResult(aliceSwapAmount);
     expectBigNumberEquals(ethers.parseUnits(aliceExpectedYTokenAmount+'', await iBGT.decimals()), aliceActualSwapForYTokenResult.Y);
     await expect(iBGT.connect(Alice).approve(await iBGTVault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
-    trans = await iBGTVault.connect(Alice).swapForYTokens(aliceSwapAmount);
+    trans = await iBGTVault.connect(Alice).swap(aliceSwapAmount);
     await expect(trans).to.changeTokenBalances(
       iBGT,
       [Alice.address, await stakingPool.getAddress()],
@@ -107,7 +107,7 @@ describe('Bribe Vault', () => {
     );
     await expect(trans)
       .to.emit(piBGT, "Rebased").withArgs(aliceSwapAmount)
-      .to.emit(iBGTVault, "YTokenDummyMinted").withArgs(currentEpochId, Alice.address, aliceSwapAmount, anyValue)
+      // .to.emit(iBGTVault, "YTokenDummyMinted").withArgs(currentEpochId, Alice.address, aliceSwapAmount, anyValue)
       .to.emit(iBGTVault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, aliceSwapAmount, anyValue);
 
     const swapTimestamp = (await provider.getBlock(trans.blockHash!))?.timestamp;
@@ -135,12 +135,12 @@ describe('Bribe Vault', () => {
     // Another 10 days later, Bob swaps 50 $iBGT for y tokens. And bribes are auto claimed for this epoch
     console.log("\n========= Bob Swaps for YTokens ===============");
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 13);
-    let bobSwapAmount = ethers.parseUnits("50", await iBGT.decimals());
-    let bobExpectedYTokenAmount = await expectedSwapForYTokens(iBGTVault, 50);  // 111673.028751
-    let bobActualSwapForYTokenResult = await iBGTVault.calcSwapForYTokens(bobSwapAmount);
+    let bobSwapAmount = ethers.parseUnits("0.1", await iBGT.decimals());
+    let bobExpectedYTokenAmount = await expectedSwapForYTokens(iBGTVault, 0.1);  // 111673.028751
+    let bobActualSwapForYTokenResult = await iBGTVault.calcSwapResult(bobSwapAmount);
     expectBigNumberEquals(ethers.parseUnits(bobExpectedYTokenAmount+'', await iBGT.decimals()), bobActualSwapForYTokenResult.Y);
     await expect(iBGT.connect(Bob).approve(await iBGTVault.getAddress(), bobSwapAmount)).not.to.be.reverted;
-    trans = await iBGTVault.connect(Bob).swapForYTokens(bobSwapAmount);
+    trans = await iBGTVault.connect(Bob).swap(bobSwapAmount);
     await expect(trans).to.changeTokenBalances(
       iBGT,
       [Bob.address], // New $iBGT is added to staking pool; but $iBGT bribe is also withdrawn
@@ -148,7 +148,7 @@ describe('Bribe Vault', () => {
     );
     await expect(trans)
       .to.emit(piBGT, "Rebased").withArgs(bobSwapAmount)
-      .to.emit(iBGTVault, "YTokenDummyMinted").withArgs(currentEpochId, Bob.address, bobSwapAmount, anyValue)
+      // .to.emit(iBGTVault, "YTokenDummyMinted").withArgs(currentEpochId, Bob.address, bobSwapAmount, anyValue)
       .to.emit(iBGTVault, "Swap").withArgs(currentEpochId, Bob.address, bobSwapAmount, bobSwapAmount, anyValue);
 
     // 16 days later, epoch ends. And all bribes are distributed

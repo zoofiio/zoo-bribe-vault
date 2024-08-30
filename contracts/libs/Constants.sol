@@ -16,7 +16,7 @@ library Constants {
     address redeemPool;
   }
 
-  struct SwapForYTokensResult {
+  struct SwapResult {
     uint256 deltaT;
     uint256 D;
     uint256 T;
@@ -36,6 +36,7 @@ library Constants {
     uint256 A;
     uint256 B;
     uint256 C;
+    uint256 X;
     uint256 Y;
   }
 
