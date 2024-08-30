@@ -209,7 +209,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     Constants.SwapResult memory args = calcSwapResult(amount);
     uint256 yTokenAmount = args.Y;
     _epochLastSwapTimestamp[_currentEpochId.current()] = block.timestamp;
-    _epochLastSwapPrice[_currentEpochId.current()] = args.P_scaled;
+
+    bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
+    _epochLastSwapPrice[_currentEpochId.current()] = useFloorPrice ? args.P_floor_scaled : args.P_scaled;
 
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yToken balance");
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].sub(yTokenAmount);
@@ -329,7 +331,17 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 epochId = _currentEpochId.current();
     EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
 
-    address[] memory rewardTokens = new address[](stakingPool.rewardTokensLength());
+    uint256 rewardTokensCount = 0;
+    while(true) {
+      try stakingPool.rewardTokens(rewardTokensCount) returns (address) {
+        rewardTokensCount++;
+      } catch {
+        break;
+      }
+    }
+    console.log("StakingPool reward tokens count: %s", rewardTokensCount);
+
+    address[] memory rewardTokens = new address[](rewardTokensCount);
     for (uint256 i = 0; i < rewardTokens.length; i++) {
       rewardTokens[i] = stakingPool.rewardTokens(i);
     }

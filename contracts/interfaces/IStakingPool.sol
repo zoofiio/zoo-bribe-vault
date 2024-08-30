@@ -7,7 +7,7 @@ interface IStakingPool {
 
   function rewardTokens(uint256 index) external view returns (address);
 
-  function rewardTokensLength() external view returns (uint256);
+  // function rewardTokensLength() external view returns (uint256);
 
   function balanceOf(address account) external view returns (uint256);
 

@@ -430,9 +430,9 @@ contract MockStakingPool is ReentrancyGuard, ProtocolOwner{
 
     /* ========== VIEWS ========== */
 
-    function rewardTokensLength() external view returns (uint256) {
-        return rewardTokens.length;
-    }
+    // function rewardTokensLength() external view returns (uint256) {
+    //     return rewardTokens.length;
+    // }
 
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
