@@ -63,7 +63,7 @@ library VaultCalculator {
     console.log("doCalcSwapF0, e1: %s, e2: %s", result.e1, result.e2);
 
     if (firstEpochSwap) {
-      // a = APRi * D / 365
+      // a = APRi * D / (86400 * 365)
       result.APRi = self.paramValue("APRi");
       result.a_scaled = result.APRi.mul(SCALE).mul(result.D).div(365 days);   // scale: 10 ** (10 + 18)
       console.log("doCalcSwapF0, first swap of epoch, result.APRi: %s, a_scaled: %s", result.APRi, result.a_scaled);
@@ -79,7 +79,7 @@ library VaultCalculator {
       console.log("doCalcSwapF0, not first swap of epoch, a_scaled: %s", result.a_scaled);
     }
 
-    // P(L(t)) = APRl * (D - t) / 365
+    // P(L(t)) = APRl * (D - t) / (86400 * 365)
     result.APRl = self.paramValue("APRl");
     result.P_floor_scaled = result.APRl.mul(SCALE).mul(epochEndTime.sub(result.t)).div(365 days);   // scale: 10 ** (10 + 18)
     console.log("doCalcSwapF0, APRl: %s, P_floor_scaled: %s", result.APRl, result.P_floor_scaled);
@@ -108,7 +108,7 @@ library VaultCalculator {
         )
       )
     );   // scale: 10 ** 18
-    result.P_scaled_positive = T.T1 > T.T2;
+    result.P_scaled_positive = SCALE.add(T.T1) > T.T2;
     console.log("doCalcSwapF0, T1: %s, T2: %s, P_scaled_positive: %s", T.T1, T.T2, result.P_scaled_positive);
     
     if (result.P_scaled_positive) {
@@ -136,7 +136,7 @@ library VaultCalculator {
 
     /**
      * B = a * deltaT / (
-     *    T * (1 + (M - S) / (e2 * M))
+     *   T * (1 + (M - S) / (e2 * M))
      * ) - a - e1 * a
      */
     result.B = result.a_scaled.mul(result.deltaT).mul(SCALE).mul(10**6).div(
@@ -197,29 +197,6 @@ library VaultCalculator {
     // k'(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
     uint256 k_t = X.add(m).mul(X.add(m)).mul(Y).div(X);   // scale: 10 ** 10
 
-    // uint256 deltaT = 0;
-    // Constants.Epoch memory epoch = self.epochInfoById(epochId);
-    // if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
-    //   // in current epoch
-    //   if (self.epochLastSwapTimestampF1(epochId) > 0) {
-    //     deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
-    //   } 
-    //   else {
-    //     deltaT = block.timestamp.sub(epoch.startTime);
-    //   }
-    // } 
-    // else {
-    //   // in a new epoch
-    //   deltaT = 0;
-    // }
-
-    // // k' = K'(t) * (1 + deltaT / 86400)^2
-    // uint256 k = k_t.mul(
-    //   SCALE + deltaT.mul(SCALE).div(86400)
-    // ).mul(
-    //   SCALE + deltaT.mul(SCALE).div(86400)
-    // ).div(SCALE);   // scale: 10 ** 10
-
     return k_t;
   }
 
@@ -268,56 +245,6 @@ library VaultCalculator {
     );
     return m;
   }
-
-  // function doCalcSwapF1(IVault self, uint256 assetAmount) public view returns (Constants.SwapResultF1 memory) {
-  //   uint256 epochId = self.currentEpochId();  // require epochId > 0
-
-  //   Constants.SwapResultF1 memory result;
-
-  //   bool firstEpochSwap = true;
-  //   result.D = self.paramValue("D");
-  //   result.APRi = self.paramValue("APRi");
-  //   Constants.Epoch memory epoch = self.epochInfoById(epochId);
-
-  //   result.S = self.yTokenUserBalance(epochId, address(this));
-  //   result.X = result.S;
-  //   if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
-  //     // in current epoch
-  //     result.t0 = epoch.startTime;
-
-  //     if (self.epochLastSwapTimestampF1(epochId) > 0) {
-  //       result.deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
-  //       firstEpochSwap = false;
-  //     } else {
-  //       result.deltaT = block.timestamp.sub(epoch.startTime);
-  //     }
-  //   } 
-  //   else {
-  //     // in a new epoch
-  //     result.t0 = block.timestamp;
-  //     result.deltaT = 0;
-  //   }
-    
-  //   result.t = block.timestamp;
-
-
-  //   if (firstEpochSwap) {
-  //     // Y = S * APRi * D / 86400 / 365
-  //     result.Y = result.S.mul(result.APRi).mul(result.D).div(86400).div(365);   // scale: 10 ** 10
-  //     // k0 = X * Y
-  //     result.k0 = result.X.mul(result.Y);   // scale: 10 ** 10
-  //     result.n = assetAmount;
-  //     // m = X - k0 / (Y + n)
-  //     result.m = result.X.sub(
-  //       result.k0.div(result.Y.add(result.n.mul(10 ** Constants.PROTOCOL_DECIMALS)))
-  //     );
-  //   }
-  //   else {
-
-  //   }
-
-  //   return result;
-  // }
 
   function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  
     Constants.Epoch memory epoch = self.epochInfoById(epochId);

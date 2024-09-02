@@ -15,6 +15,8 @@ describe('Bribe Vault', () => {
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
 
     await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("SwapF"), 0);
+    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f1"), 0);
+    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f2"), 0);
 
     await expect(iBGT.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await iBGT.decimals()))).not.to.be.reverted;
     await expect(iBGT.connect(Alice).mint(Bob.address, ethers.parseUnits("1000000", await iBGT.decimals()))).not.to.be.reverted;
@@ -110,11 +112,11 @@ describe('Bribe Vault', () => {
     await expect(trans)
       .to.emit(piBGT, "Rebased").withArgs(aliceSwapAmount)
       // .to.emit(vault, "YTokenDummyMinted").withArgs(currentEpochId, Alice.address, aliceSwapAmount, anyValue)
-      .to.emit(vault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, aliceSwapAmount, anyValue);
+      .to.emit(vault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, 0, aliceSwapAmount, anyValue);
 
     const swapTimestamp = (await provider.getBlock(trans.blockHash!))?.timestamp;
-    expectBigNumberEquals(aliceActualSwapForYTokenResult.P_floor_scaled, await vault.epochLastSwapPriceScaled(currentEpochId));
-    expectBigNumberEquals(BigInt(swapTimestamp!), await vault.epochLastSwapTimestamp(currentEpochId));
+    expectBigNumberEquals(aliceActualSwapForYTokenResult.P_floor_scaled, await vault.epochLastSwapPriceScaledF0(currentEpochId));
+    expectBigNumberEquals(BigInt(swapTimestamp!), await vault.epochLastSwapTimestampF0(currentEpochId));
     
     // No bribes now
     // console.log(ethers.formatUnits(await iBGT.balanceOf(Alice.address), await iBGT.decimals()));
@@ -151,7 +153,7 @@ describe('Bribe Vault', () => {
     // await expect(trans)
     //   .to.emit(piBGT, "Rebased").withArgs(bobSwapAmount)
     //   // .to.emit(vault, "YTokenDummyMinted").withArgs(currentEpochId, Bob.address, bobSwapAmount, anyValue)
-    //   .to.emit(vault, "Swap").withArgs(currentEpochId, Bob.address, bobSwapAmount, bobSwapAmount, anyValue);
+    //   .to.emit(vault, "Swap").withArgs(currentEpochId, Bob.address, bobSwapAmount, 0, bobSwapAmount, anyValue);
 
     // 16 days later, epoch ends. And all bribes are distributed
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);

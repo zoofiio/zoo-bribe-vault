@@ -26,6 +26,11 @@ describe('RedeemPool', () => {
     mockVault = MockVault__factory.connect(await MockVault.getAddress(), ethers.provider);
     piBGT = PToken__factory.connect(await mockVault.pToken(), ethers.provider);
 
+    let trans = await protocol.connect(Alice).addVault(await mockVault.getAddress());
+    await trans.wait();
+    await settings.connect(Alice).updateVaultParamValue(await mockVault.getAddress(), ethers.encodeBytes32String("f1"), 0);
+    await settings.connect(Alice).updateVaultParamValue(await mockVault.getAddress(), ethers.encodeBytes32String("f2"), 0);
+
     const RedeemPoolFactory = await ethers.getContractFactory("RedeemPool");
     const RedeemPool = await RedeemPoolFactory.deploy(await mockVault.getAddress());
     redeemPool = RedeemPool__factory.connect(await RedeemPool.getAddress(), ethers.provider);
@@ -169,7 +174,7 @@ describe('RedeemPool', () => {
       [Alice.address, await redeemPool.getAddress()],
       [ethers.parseUnits("0.0022", await iBGT.decimals()), -ethers.parseUnits("0.0022", await iBGT.decimals())]
     );
-    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Alice.address, ethers.parseUnits("0.0022", await iBGT.decimals()));
+    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Alice.address, ethers.parseUnits("0.0022", await iBGT.decimals()), ethers.parseUnits("0.0022", await iBGT.decimals()), 0);
 
     // Bob exit
     trans = await redeemPool.connect(Bob).exit();
@@ -178,7 +183,7 @@ describe('RedeemPool', () => {
       [Bob.address, await redeemPool.getAddress()],
       [ethers.parseUnits("0.0033", await iBGT.decimals()), -ethers.parseUnits("0.0033", await iBGT.decimals())]
     );
-    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Bob.address, ethers.parseUnits("0.0033", await iBGT.decimals()));
+    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Bob.address, ethers.parseUnits("0.0033", await iBGT.decimals()), ethers.parseUnits("0.0033", await iBGT.decimals()), 0);
 
   });
 
