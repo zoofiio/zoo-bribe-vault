@@ -289,3 +289,76 @@ export async function expectedSwapForYTokensF0(vault: Vault, assetAmount: number
 
   return result.Y;
 }
+
+export async function expectedSwapK0(vault: Vault) {
+  const epochId = await vault.currentEpochId(); 
+  const D = await vault.paramValue(encodeBytes32String("D"));
+  const APRi = await vault.paramValue(encodeBytes32String("APRi"));
+
+  const S = await vault.yTokenUserBalance(epochId, await vault.getAddress());
+  const X = S;
+
+  // Y = S * APRi * D / 86400 / 365
+  const Y = S * APRi * D / 86400n / 365n;   // scale: 10 ** 10
+  // k0 = X * Y
+  const k0 = X * Y;   // scale: 10 ** 10
+
+  return Number(k0);
+}
+
+export async function expectedSwapKt(vault: Vault, m: number) {
+  const epochId = await vault.currentEpochId(); 
+  const D = await vault.paramValue("D");
+  const APRi = await vault.paramValue("APRi");
+
+  const S = await vault.yTokenUserBalance(epochId, await vault.getAddress());
+  const X = S;
+
+  // Y = S * APRi * D / 86400 / 365
+  const Y = S * APRi * D / 86400n / 365n;   // scale: 10 ** 10
+
+  // k'(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
+  const k_t = (X + BigInt(m)) * (X + BigInt(m)) * Y / X   // scale: 10 ** 10
+
+  return Number(k_t);
+}
+
+export async function expectedCalcSwapF1(vault: Vault, n: number) {
+  const epochId = await vault.currentEpochId();  // require epochId > 0
+  const D = await vault.paramValue("D");
+  const APRi = await vault.paramValue("APRi");
+  const S = await vault.yTokenUserBalance(epochId, await vault.getAddress());
+  const X = S;
+
+  // Y = S * APRi * D / 86400 / 365
+  const Y = S * APRi * D / 86400n / 365n;   // scale: 10 ** 10
+  // k0 = X * Y
+  const k0 = X * Y;   // scale: 10 ** 10
+
+  let deltaT = 0;
+  let kt = k0;
+  const epoch = await vault.epochInfoById(epochId);
+  if (epoch.startTime + epoch.duration >= await time.latest()) {
+    // in current epoch
+    if (await vault.epochLastSwapTimestampF1(epochId) > 0) {
+      deltaT = (await time.latest()) - Number(await vault.epochLastSwapTimestampF1(epochId));
+    } 
+    else {
+      deltaT = (await time.latest()) - Number(epoch.startTime);
+    }
+    if (await vault.epochLastMintKtF1(epochId) > 0) {
+      kt = await vault.epochLastMintKtF1(epochId);
+    } 
+  } 
+  else {
+    // in a new epoch
+    deltaT = 0;
+  }
+
+  // k' = K'(t) * (1 + deltaT / 86400)^2
+  const k = Number(kt) * (1 + deltaT / 86400) * (1 + deltaT / 86400);   // scale: 10 ** 10
+
+  // m = X - k / (Y + n)
+  const m = Number(X) - k / (Number(Y) + n);   // scale: 10 ** 10
+  return m;
+}
