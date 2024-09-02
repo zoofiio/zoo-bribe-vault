@@ -16,73 +16,73 @@ library VaultCalculator {
 
   uint256 public constant SCALE = 10 ** 18;
 
-  function doCalcSwapCommon(IVault self) public view returns (Constants.SwapResult memory) {
+  function doCalcSwapF0(IVault self, uint256 assetAmount) public view returns (Constants.SwapResultF0 memory) {
     uint256 epochId = self.currentEpochId();  // require epochId > 0
 
-    Constants.SwapResult memory args;
+    Constants.SwapResultF0 memory result;
 
     bool firstEpochSwap = true;
     uint256 epochLastSwapPriceScaled = 0;
     uint256 epochEndTime = 0;
-    args.D = self.paramValue("D");
-    console.log("doCalcSwapCommon, D: %s", args.D);
+    result.D = self.paramValue("D");
+    console.log("doCalcSwapF0, D: %s", result.D);
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
       // in current epoch
-      args.M = self.yTokenTotalSupply(epochId);
-      args.S = self.yTokenUserBalance(epochId, address(this));
-      args.t0 = epoch.startTime;
-      console.log("doCalcSwapCommon, current epoch, M: %s, S: %s, t0: %s", args.M, args.S, args.t0);
+      result.M = self.yTokenTotalSupply(epochId);
+      result.S = self.yTokenUserBalance(epochId, address(this));
+      result.t0 = epoch.startTime;
+      console.log("doCalcSwapF0, current epoch, M: %s, S: %s, t0: %s", result.M, result.S, result.t0);
 
-      if (self.epochLastSwapTimestamp(epochId) > 0) {
-        args.deltaT = block.timestamp.sub(self.epochLastSwapTimestamp(epochId));
+      if (self.epochLastSwapTimestampF0(epochId) > 0) {
+        result.deltaT = block.timestamp.sub(self.epochLastSwapTimestampF0(epochId));
         firstEpochSwap = false;
-        epochLastSwapPriceScaled = self.epochLastSwapPriceScaled(epochId);
+        epochLastSwapPriceScaled = self.epochLastSwapPriceScaledF0(epochId);
       } else {
-        args.deltaT = block.timestamp.sub(epoch.startTime);
+        result.deltaT = block.timestamp.sub(epoch.startTime);
       }
       epochEndTime = epoch.startTime.add(epoch.duration);
-      console.log("doCalcSwapCommon, current epoch, deltaT: %s", args.deltaT);
+      console.log("doCalcSwapF0, current epoch, deltaT: %s", result.deltaT);
     } 
     else {
       // in a new epoch
-      args.M = self.yTokenUserBalance(epochId, address(this));
-      args.S = self.yTokenUserBalance(epochId, address(this));
-      args.t0 = block.timestamp;
-      args.deltaT = 0;
-      epochEndTime = block.timestamp.add(args.D);
+      result.M = self.yTokenUserBalance(epochId, address(this));
+      result.S = self.yTokenUserBalance(epochId, address(this));
+      result.t0 = block.timestamp;
+      result.deltaT = 0;
+      epochEndTime = block.timestamp.add(result.D);
 
-      console.log("doCalcSwapCommon, new epoch, M: %s, S: %s, t0: %s, deltaT: 0", args.M, args.S, args.t0);
+      console.log("doCalcSwapF0, new epoch, M: %s, S: %s, t0: %s, deltaT: 0", result.M, result.S, result.t0);
     }
     
-    args.T = self.paramValue("T");
-    args.t = block.timestamp;
-    args.e1 = self.paramValue("e1");
-    args.e2 = self.paramValue("e2");
-    console.log("doCalcSwapCommon, T: %s, t: %s", args.T, args.t);
-    console.log("doCalcSwapCommon, e1: %s, e2: %s", args.e1, args.e2);
+    result.T = self.paramValue("T");
+    result.t = block.timestamp;
+    result.e1 = self.paramValue("e1");
+    result.e2 = self.paramValue("e2");
+    console.log("doCalcSwapF0, T: %s, t: %s", result.T, result.t);
+    console.log("doCalcSwapF0, e1: %s, e2: %s", result.e1, result.e2);
 
     if (firstEpochSwap) {
       // a = APRi * D / 365
-      args.APRi = self.paramValue("APRi");
-      args.a_scaled = args.APRi.mul(SCALE).mul(args.D).div(365 days);   // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapCommon, first swap of epoch, args.APRi: %s, a_scaled: %s", args.APRi, args.a_scaled);
+      result.APRi = self.paramValue("APRi");
+      result.a_scaled = result.APRi.mul(SCALE).mul(result.D).div(365 days);   // scale: 10 ** (10 + 18)
+      console.log("doCalcSwapF0, first swap of epoch, result.APRi: %s, a_scaled: %s", result.APRi, result.a_scaled);
     }
     else {
       // a = P / (1 + e1 * (M - S) / M)
       require(epochLastSwapPriceScaled > 0, "Invalid last epoch swap price");
-      args.a_scaled = epochLastSwapPriceScaled.mul(SCALE).div(
+      result.a_scaled = epochLastSwapPriceScaled.mul(SCALE).div(
         (SCALE).add(
-          args.e1.mul(args.M.sub(args.S)).mul(SCALE).div(args.M)
+          result.e1.mul(result.M.sub(result.S)).mul(SCALE).div(result.M)
         )
       );  // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapCommon, not first swap of epoch, a_scaled: %s", args.a_scaled);
+      console.log("doCalcSwapF0, not first swap of epoch, a_scaled: %s", result.a_scaled);
     }
 
     // P(L(t)) = APRl * (D - t) / 365
-    args.APRl = self.paramValue("APRl");
-    args.P_floor_scaled = args.APRl.mul(SCALE).mul(epochEndTime.sub(args.t)).div(365 days);   // scale: 10 ** (10 + 18)
-    console.log("doCalcSwapCommon, APRl: %s, P_floor_scaled: %s", args.APRl, args.P_floor_scaled);
+    result.APRl = self.paramValue("APRl");
+    result.P_floor_scaled = result.APRl.mul(SCALE).mul(epochEndTime.sub(result.t)).div(365 days);   // scale: 10 ** (10 + 18)
+    console.log("doCalcSwapF0, APRl: %s, P_floor_scaled: %s", result.APRl, result.P_floor_scaled);
 
     /**
      * P(S,t) = a * (
@@ -99,107 +99,225 @@ library VaultCalculator {
      */
     Constants.Terms memory T;
     // (1 + e1 * (M - S) / M)
-    T.T1 = args.e1.mul(args.M.sub(args.S)).mul(SCALE).div(args.M);   // scale: 10 ** 18
+    T.T1 = result.e1.mul(result.M.sub(result.S)).mul(SCALE).div(result.M);   // scale: 10 ** 18
     // deltaT / (T * (1 + (M - S) / (e2 * M)))
-    T.T2 = args.deltaT.mul(SCALE).mul(SCALE).div(
-      args.T.mul(
+    T.T2 = result.deltaT.mul(SCALE).mul(SCALE).div(
+      result.T.mul(
         SCALE.add(
-          args.M.sub(args.S).mul(SCALE).div(args.e2.mul(args.M))
+          result.M.sub(result.S).mul(SCALE).div(result.e2.mul(result.M))
         )
       )
     );   // scale: 10 ** 18
-    args.P_scaled_positive = T.T1 > T.T2;
-    console.log("doCalcSwapCommon, T1: %s, T2: %s, P_scaled_positive: %s", T.T1, T.T2, args.P_scaled_positive);
+    result.P_scaled_positive = T.T1 > T.T2;
+    console.log("doCalcSwapF0, T1: %s, T2: %s, P_scaled_positive: %s", T.T1, T.T2, result.P_scaled_positive);
     
-    if (args.P_scaled_positive) {
+    if (result.P_scaled_positive) {
       T.T3 = SCALE.add(T.T1).sub(T.T2);   // scale: 10 ** 18
     } else {
       T.T3 = T.T2.sub(T.T1).sub(SCALE);   // scale: 10 ** 18
     }
-    args.P_scaled = args.a_scaled.mul(T.T3).div(SCALE);   // scale: 10 ** (10 + 18)
-    console.log("doCalcSwapCommon, P_scaled: %s", args.P_scaled);
+    result.P_scaled = result.a_scaled.mul(T.T3).div(SCALE);   // scale: 10 ** (10 + 18)
+    console.log("doCalcSwapF0, P_scaled: %s", result.P_scaled);
 
-    bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
+    bool useFloorPrice = (!result.P_scaled_positive) || (result.P_scaled < result.P_floor_scaled);
     if (useFloorPrice) {
       /**
        * a1 = P_floor / (
        *    (1 + e1 * (M - S) / M) 
        * )
        */
-      args.a_scaled = args.P_floor_scaled.mul(SCALE).div(SCALE.add(T.T1));  // scale: 10 ** (10 + 18)
-      console.log("doCalcSwapCommon, useFloorPrice, a_scaled: %s", args.a_scaled);
+      result.a_scaled = result.P_floor_scaled.mul(SCALE).div(SCALE.add(T.T1));  // scale: 10 ** (10 + 18)
+      console.log("doCalcSwapF0, useFloorPrice, a_scaled: %s", result.a_scaled);
     }
 
     // A = a / M
-    args.A = args.a_scaled.mul(10**6).div(args.M);  // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapCommon, A: %s", args.A);
+    result.A = result.a_scaled.mul(10**6).div(result.M);  // scale: 10 ** (10 + 18 + 6)
+    console.log("doCalcSwapF0, A: %s", result.A);
 
     /**
      * B = a * deltaT / (
      *    T * (1 + (M - S) / (e2 * M))
      * ) - a - e1 * a
      */
-    args.B = args.a_scaled.mul(args.deltaT).mul(SCALE).mul(10**6).div(
-      args.T.mul(
+    result.B = result.a_scaled.mul(result.deltaT).mul(SCALE).mul(10**6).div(
+      result.T.mul(
         SCALE.add(
-          args.M.sub(args.S).mul(SCALE).div(args.e2.mul(args.M))
+          result.M.sub(result.S).mul(SCALE).div(result.e2.mul(result.M))
         )
       )
-    ).sub(args.a_scaled.mul(10**6)).sub(args.e1.mul(args.a_scaled).mul(10**6));   // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapCommon, B: %s", args.B);
+    ).sub(result.a_scaled.mul(10**6)).sub(result.e1.mul(result.a_scaled).mul(10**6));   // scale: 10 ** (10 + 18 + 6)
+    console.log("doCalcSwapF0, B: %s", result.B);
 
-    return args;
-  }
-
-  function doCalcSwapY2X(IVault self, uint256 expectedYTokens) public view returns (Constants.SwapResult memory) {
-    Constants.SwapResult memory args = doCalcSwapCommon(self);
-
-    args.Y = expectedYTokens;
-
-    /**
-     * X = a * Y - a * deltaT * Y / (
-     *  T * (1 + (M - S) / (e2 * M))
-     * ) + e1 * a / M * (M * Y - Y^2 / 2)
-     */
-    Constants.Terms memory T;
-    T.T1 = args.a_scaled.mul(args.Y);
-    T.T2 = args.a_scaled.mul(args.deltaT).mul(args.Y).mul(SCALE);
-    T.T3 = args.T.mul(
-      SCALE.add(
-        args.M.sub(args.S).mul(SCALE).div(args.e2.mul(args.M))
-      )
-    );
-    T.T4 = args.e1.mul(args.a_scaled).mul(
-      args.M.mul(args.Y).sub(args.Y.mul(args.Y).div(2))
-    ).div(args.M);
-    
-    args.X = T.T1.sub(
-      T.T2.div(T.T3)
-    ).add(T.T4).div(SCALE).div(10 ** Constants.PROTOCOL_DECIMALS);
-
-    return args;
-  }
-
-  function doCalcSwapX2Y(IVault self, uint256 assetAmount) public view returns (Constants.SwapResult memory) {
-    Constants.SwapResult memory args = doCalcSwapCommon(self);
 
     // C = X
-    args.X = assetAmount;
-    args.C = assetAmount.mul(10 ** Constants.PROTOCOL_DECIMALS).mul(SCALE).mul(10**6);    // scale: 10 ** (10 + 18 + 6)
-    console.log("doCalcSwapX2Y, C: %s", args.C);
+    result.X = assetAmount;
+    result.C = assetAmount.mul(10 ** Constants.PROTOCOL_DECIMALS).mul(SCALE).mul(10**6);    // scale: 10 ** (10 + 18 + 6)
+    console.log("doCalcSwapF0, C: %s", result.C);
 
     /**
      * Y(X) = (B + sqrt(B * B + 4 * A * C)) / (2 * A)
      */
-    args.Y = args.B.add(
+    result.Y = result.B.add(
       Math.sqrt(
-        args.B.mul(args.B).add(args.A.mul(4).mul(args.C))
+        result.B.mul(result.B).add(result.A.mul(4).mul(result.C))
       )
-    ).div(args.A.mul(2));
-    console.log("doCalcSwapX2Y, Y: %s", args.Y);
+    ).div(result.A.mul(2));
+    console.log("doCalcSwapF0, Y: %s", result.Y);
 
-    return args;
+    return result;
   }
+
+  function calcSwapK0(IVault self) public view returns (uint256) {
+    uint256 epochId = self.currentEpochId(); 
+    uint256 D = self.paramValue("D");
+    uint256 APRi = self.paramValue("APRi");
+
+    uint256 S = self.yTokenUserBalance(epochId, address(this));
+    uint256 X = S;
+
+    // Y = S * APRi * D / 86400 / 365
+    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
+    // k0 = X * Y
+    uint256 k0 = X.mul(Y);   // scale: 10 ** 10
+
+    return k0;
+  }
+
+  function calcSwapKt(IVault self, uint256 m) public view returns (uint256) {
+    uint256 epochId = self.currentEpochId(); 
+    uint256 D = self.paramValue("D");
+    uint256 APRi = self.paramValue("APRi");
+
+    uint256 S = self.yTokenUserBalance(epochId, address(this));
+    uint256 X = S;
+
+    // Y = S * APRi * D / 86400 / 365
+    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
+
+    // k'(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
+    uint256 k_t = X.add(m).mul(X.add(m)).mul(Y).div(X);   // scale: 10 ** 10
+
+    // uint256 deltaT = 0;
+    // Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    // if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
+    //   // in current epoch
+    //   if (self.epochLastSwapTimestampF1(epochId) > 0) {
+    //     deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
+    //   } 
+    //   else {
+    //     deltaT = block.timestamp.sub(epoch.startTime);
+    //   }
+    // } 
+    // else {
+    //   // in a new epoch
+    //   deltaT = 0;
+    // }
+
+    // // k' = K'(t) * (1 + deltaT / 86400)^2
+    // uint256 k = k_t.mul(
+    //   SCALE + deltaT.mul(SCALE).div(86400)
+    // ).mul(
+    //   SCALE + deltaT.mul(SCALE).div(86400)
+    // ).div(SCALE);   // scale: 10 ** 10
+
+    return k_t;
+  }
+
+  function doCalcSwapF1(IVault self, uint256 n) public view returns (uint256) {
+    uint256 epochId = self.currentEpochId();  // require epochId > 0
+    uint256 D = self.paramValue("D");
+    uint256 APRi = self.paramValue("APRi");
+    uint256 S = self.yTokenUserBalance(epochId, address(this));
+    uint256 X = S;
+
+    // Y = S * APRi * D / 86400 / 365
+    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
+    // k0 = X * Y
+    uint256 k0 = X.mul(Y);   // scale: 10 ** 10
+
+    uint256 deltaT = 0;
+    uint256 kt = k0;
+    Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
+      // in current epoch
+      if (self.epochLastSwapTimestampF1(epochId) > 0) {
+        deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
+      } 
+      else {
+        deltaT = block.timestamp.sub(epoch.startTime);
+      }
+      if (self.epochLastMintKtF1(epochId) > 0) {
+        kt = self.epochLastMintKtF1(epochId);
+      } 
+    } 
+    else {
+      // in a new epoch
+      deltaT = 0;
+    }
+
+    // k' = K'(t) * (1 + deltaT / 86400)^2
+    uint256 k = kt.mul(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    ).mul(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    ).div(SCALE);   // scale: 10 ** 10
+
+    // m = X - k / (Y + n)
+    uint256 m = X.sub(
+      k.div(Y.add(n)).div(10 ** Constants.PROTOCOL_DECIMALS)
+    );
+    return m;
+  }
+
+  // function doCalcSwapF1(IVault self, uint256 assetAmount) public view returns (Constants.SwapResultF1 memory) {
+  //   uint256 epochId = self.currentEpochId();  // require epochId > 0
+
+  //   Constants.SwapResultF1 memory result;
+
+  //   bool firstEpochSwap = true;
+  //   result.D = self.paramValue("D");
+  //   result.APRi = self.paramValue("APRi");
+  //   Constants.Epoch memory epoch = self.epochInfoById(epochId);
+
+  //   result.S = self.yTokenUserBalance(epochId, address(this));
+  //   result.X = result.S;
+  //   if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
+  //     // in current epoch
+  //     result.t0 = epoch.startTime;
+
+  //     if (self.epochLastSwapTimestampF1(epochId) > 0) {
+  //       result.deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
+  //       firstEpochSwap = false;
+  //     } else {
+  //       result.deltaT = block.timestamp.sub(epoch.startTime);
+  //     }
+  //   } 
+  //   else {
+  //     // in a new epoch
+  //     result.t0 = block.timestamp;
+  //     result.deltaT = 0;
+  //   }
+    
+  //   result.t = block.timestamp;
+
+
+  //   if (firstEpochSwap) {
+  //     // Y = S * APRi * D / 86400 / 365
+  //     result.Y = result.S.mul(result.APRi).mul(result.D).div(86400).div(365);   // scale: 10 ** 10
+  //     // k0 = X * Y
+  //     result.k0 = result.X.mul(result.Y);   // scale: 10 ** 10
+  //     result.n = assetAmount;
+  //     // m = X - k0 / (Y + n)
+  //     result.m = result.X.sub(
+  //       result.k0.div(result.Y.add(result.n.mul(10 ** Constants.PROTOCOL_DECIMALS)))
+  //     );
+  //   }
+  //   else {
+
+  //   }
+
+  //   return result;
+  // }
 
   function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  
     Constants.Epoch memory epoch = self.epochInfoById(epochId);

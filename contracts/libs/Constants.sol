@@ -16,7 +16,7 @@ library Constants {
     address redeemPool;
   }
 
-  struct SwapResult {
+  struct SwapResultF0 {
     uint256 deltaT;
     uint256 D;
     uint256 T;
@@ -39,6 +39,21 @@ library Constants {
     uint256 X;
     uint256 Y;
   }
+
+  // struct SwapResultF1 {
+  //   uint256 D;
+  //   uint256 APRi;
+  //   uint256 t;
+  //   uint256 t0;
+  //   uint256 deltaT;
+
+  //   uint256 k0;
+  //   uint256 S;
+  //   uint256 X;
+  //   uint256 Y;
+  //   uint256 n;
+  //   uint256 m;
+  // }
 
   struct BribeInfo {
     uint256 epochId;

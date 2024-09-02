@@ -5,6 +5,8 @@ import "../libs/Constants.sol";
 
 interface IVault {
 
+  function settings() external view returns (address);
+
   function currentEpochId() external view returns (uint256);
 
   function epochInfoById(uint256 epochId) external view returns (Constants.Epoch memory);
@@ -29,8 +31,12 @@ interface IVault {
 
   function bribeTotalAmount(uint256 epochId, address bribeToken) external view returns (uint256);
 
-  function epochLastSwapTimestamp(uint256 epochId) external view returns (uint256);
+  function epochLastSwapTimestampF0(uint256 epochId) external view returns (uint256);
 
-  function epochLastSwapPriceScaled(uint256 epochId) external view returns (uint256);
+  function epochLastSwapPriceScaledF0(uint256 epochId) external view returns (uint256);
+
+  function epochLastSwapTimestampF1(uint256 epochId) external view returns (uint256);
+
+  function epochLastMintKtF1(uint256 epochId) external view returns (uint256);
 
 }

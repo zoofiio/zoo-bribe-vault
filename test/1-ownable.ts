@@ -16,15 +16,15 @@ describe("Ownable", () => {
 
   it("Protocol ownable work", async () => {
     const {
-      Alice, Bob, protocol, settings, iBGTVault
+      Alice, Bob, protocol, settings, vault
     } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await iBGTVault.pToken(), provider);
+    const piBGT = PToken__factory.connect(await vault.pToken(), provider);
 
     let protocolOwner = await protocol.owner();
     expect(protocolOwner).to.equal(await protocol.protocolOwner(), "Protocol owner is Alice");
     expect(protocolOwner).to.equal(Alice.address, "Protocol owner is Alice");
 
-    const contracts = [settings, iBGTVault, piBGT];
+    const contracts = [settings, vault, piBGT];
     for (const contract of contracts) {
       const owner = await contract.owner();
       expect(owner).to.equal(protocolOwner, "Contract owner is protocol owner Alice");
@@ -47,9 +47,9 @@ describe("Ownable", () => {
 
   it("Privileged operations", async () => {
     const {
-      Alice, Bob, protocol, settings, iBGTVault, stakingPool, vaultCalculator
+      Alice, Bob, protocol, settings, vault, stakingPool, vaultCalculator
     } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await iBGTVault.pToken(), provider);
+    const piBGT = PToken__factory.connect(await vault.pToken(), provider);
 
     let protocolOwner = await protocol.owner();
     expect(protocolOwner).to.equal(await protocol.protocolOwner(), "Protocol owner is Alice");

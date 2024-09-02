@@ -33,7 +33,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   bool internal _swapPaused;
   bool internal _claimBribesPaused;
 
-  IProtocolSettings public immutable settings;
+  address public immutable settings;
   IStakingPool public stakingPool;
 
   IERC20 internal immutable _assetToken;
@@ -48,8 +48,11 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   mapping(uint256 => uint256) _yTokenTotalSupplySynthetic;
   mapping(uint256 => mapping(address => uint256)) _yTokenUserBalancesSynthetic;
 
-  mapping(uint256 => uint256) _epochLastSwapTimestamp;
-  mapping(uint256 => uint256) _epochLastSwapPrice;  // P(S,t)
+  mapping(uint256 => uint256) _epochLastSwapTimestampF0;
+  mapping(uint256 => uint256) _epochLastSwapPriceF0;  // P(S,t)
+
+  mapping(uint256 => uint256) _epochLastSwapTimestampF1;
+  mapping(uint256 => uint256) _epochLastMintKtF1;
 
   mapping(uint256 => EnumerableSet.AddressSet) internal _bribeTokens;  // epoch id => bribe tokens set
   mapping(uint256 => mapping(address => uint256)) internal _bribeTotalAmount;  // epoch id => (bribe token => total amount)
@@ -67,7 +70,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN, "Asset token cannot be NATIVE_TOKEN");
 
-    settings = IProtocolSettings(_settings);
+    settings = _settings;
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
@@ -150,23 +153,31 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   function paramValue(bytes32 param) public view override returns (uint256) {
-    return settings.vaultParamValue(address(this), param);
+    return IProtocolSettings(settings).vaultParamValue(address(this), param);
   }
 
-  function epochLastSwapTimestamp(uint256 epochId) public view returns (uint256) {
-    return _epochLastSwapTimestamp[epochId];
+  function epochLastSwapTimestampF0(uint256 epochId) public view returns (uint256) {
+    return _epochLastSwapTimestampF0[epochId];
   }
 
-  function epochLastSwapPriceScaled(uint256 epochId) public view returns (uint256) {
-    return _epochLastSwapPrice[epochId];
+  function epochLastSwapPriceScaledF0(uint256 epochId) public view returns (uint256) {
+    return _epochLastSwapPriceF0[epochId];
   }
 
-  function calcSwapResult(uint256 assetAmount) public view returns (Constants.SwapResult memory) {
-    return IVault(this).doCalcSwapX2Y(assetAmount);
+  function epochLastSwapTimestampF1(uint256 epochId) public view returns (uint256) {
+    return _epochLastSwapTimestampF1[epochId];
   }
 
-  function calcSwapResultWithExpectedYTokenAmount(uint256 expectedYTokenAmount) public view returns (Constants.SwapResult memory) {
-    return IVault(this).doCalcSwapY2X(expectedYTokenAmount);
+  function epochLastMintKtF1(uint256 epochId) public view returns (uint256) {
+    return _epochLastMintKtF1[epochId];
+  }
+
+  function calcSwapResultF0(uint256 assetAmount) public view returns (Constants.SwapResultF0 memory) {
+    return IVault(this).doCalcSwapF0(assetAmount);
+  }
+
+  function calcSwapResultF1(uint256 assetAmount) public view returns (uint256) {
+    return IVault(this).doCalcSwapF1(assetAmount);
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
@@ -180,12 +191,20 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 pTokenSharesAmount = IPToken(_pToken).mint(_msgSender(), pTokenAmount);
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
+    // update k'(t)
+    uint256 yTokenAmount = amount;
+    if (_yTokenUserBalances[_currentEpochId.current()][address(this)] == 0) {
+      _epochLastMintKtF1[_currentEpochId.current()] = IVault(this).calcSwapK0();
+    }
+    else {
+      _epochLastMintKtF1[_currentEpochId.current()] = IVault(this).calcSwapKt(yTokenAmount);
+    }
+
     // mint yToken to Vault
     Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
     uint256 currentEpochEndTime = currentEpoch.startTime.add(currentEpoch.duration);
     require(block.timestamp <= currentEpochEndTime, "Current epoch has ended");
 
-    uint256 yTokenAmount = amount;
     _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()].add(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
@@ -194,6 +213,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].add(yTokenAmountSynthetic);
 
+
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
@@ -201,17 +221,29 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     require(IERC20(_pToken).totalSupply() > 0, "No principal token minted yet");
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
-    stakingPool.stake(amount);
 
-    uint256 pTokenAmount = amount;
+    uint256 fees = amount.mul(paramValue("f2")).div(10 ** IProtocolSettings(settings).decimals());
+    if (fees > 0) {
+      TokensTransfer.transferTokens(address(_assetToken), address(this), IProtocolSettings(settings).treasury(), fees);
+    }
+    uint256 netAmount = amount.sub(fees);
+    uint256 pTokenAmount = netAmount;
+    stakingPool.stake(pTokenAmount);
     IPToken(_pToken).rebase(pTokenAmount);
 
-    Constants.SwapResult memory args = calcSwapResult(amount);
-    uint256 yTokenAmount = args.Y;
-    _epochLastSwapTimestamp[_currentEpochId.current()] = block.timestamp;
+    uint256 yTokenAmount = 0;
+    uint256 swapFormula = paramValue("SwapF");
+    if (swapFormula == 0) {
+      Constants.SwapResultF0 memory args = calcSwapResultF0(netAmount);
+      yTokenAmount = args.Y;
+      _epochLastSwapTimestampF0[_currentEpochId.current()] = block.timestamp;
 
-    bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
-    _epochLastSwapPrice[_currentEpochId.current()] = useFloorPrice ? args.P_floor_scaled : args.P_scaled;
+      bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
+      _epochLastSwapPriceF0[_currentEpochId.current()] = useFloorPrice ? args.P_floor_scaled : args.P_scaled;
+    }
+    else {
+      yTokenAmount = calcSwapResultF1(netAmount);
+    }
 
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yToken balance");
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].sub(yTokenAmount);
@@ -222,7 +254,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].sub(yTokenAmountSynthetic);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()].add(yTokenAmountSynthetic);
 
-    emit Swap(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
+    emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
   }
 
   function claimBribes(uint256 epochId) external nonReentrant whenClaimBribesNotPaused validEpochId(epochId) {
@@ -278,14 +310,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit ClaimBribesUnpaused();
   }
 
-  function updateStakingPool(address _stakingPool) external nonReentrant onlyOwner {
-    stakingPool = IStakingPool(_stakingPool);
-  }
+  // function updateStakingPool(address _stakingPool) external nonReentrant onlyOwner {
+  //   stakingPool = IStakingPool(_stakingPool);
+  // }
 
-  function rescueFromStakingPool(uint256 amount, address recipient) external nonReentrant onlyOwner {
-    stakingPool.withdraw(amount);
-    TokensTransfer.transferTokens(address(_assetToken), address(this), recipient, amount);
-  }
+  // function rescueFromStakingPool(uint256 amount, address recipient) external nonReentrant onlyOwner {
+  //   stakingPool.withdraw(amount);
+  //   TokensTransfer.transferTokens(address(_assetToken), address(this), recipient, amount);
+  // }
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
@@ -314,7 +346,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
 
     _epochs[epochId].epochId = epochId;
     _epochs[epochId].startTime = block.timestamp;
-    _epochs[epochId].duration = settings.vaultParamValue(address(this), "D");
+    _epochs[epochId].duration = paramValue("D");
     _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
 
     // Y tokens virtually hold by the Vault, need move to new epoch
@@ -396,6 +428,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   }
 
   modifier validEpochId(uint256 epochId) {
+    // console.log("validEpochId, epochId: %s, currentEpochId: %s, _epochs[epochId].startTime: %s", epochId, _currentEpochId.current(), _epochs[epochId].startTime);
     require(
       epochId > 0 && epochId <= _currentEpochId.current() && _epochs[epochId].startTime > 0,
       "Invalid epoch id"
@@ -435,7 +468,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   event YTokenDummyBurned(uint256 indexed epochId, address indexed user, uint256 yTokenAmount);
 
   event Deposit(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);
-  event Swap(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);
+  event Swap(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 fees, uint256 pTokenAmount, uint256 yTokenAmount);
   event BribesClaimed(address indexed bribeToken, address indexed user, uint256 amount);
 
   event BribeTokenAdded(uint256 indexed epochId, address indexed bribeToken);

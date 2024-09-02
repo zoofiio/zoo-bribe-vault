@@ -13,7 +13,7 @@ import "../tokens/PToken.sol";
 import "../vaults/RedeemPool.sol";
 
 contract MockVault is IVault {
-  IProtocolSettings public immutable settings;
+  address public immutable settings;
   IStakingPool public immutable stakingPool;
 
   IERC20 internal immutable _assetToken;
@@ -26,7 +26,7 @@ contract MockVault is IVault {
     address _assetToken_,
     string memory _pTokenName, string memory _pTokensymbol
   ) {
-    settings = IProtocolSettings(_settings);
+    settings = _settings;
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
@@ -83,14 +83,21 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function epochLastSwapTimestamp(uint256) public pure returns (uint256) {
+  function epochLastSwapTimestampF0(uint256) external pure returns (uint256) {
     return 0;
   }
 
-  function epochLastSwapPriceScaled(uint256) public pure returns (uint256) {
+  function epochLastSwapPriceScaledF0(uint256) external pure returns (uint256) {
     return 0;
   }
 
+  function epochLastSwapTimestampF1(uint256) external pure returns (uint256) {
+    return 0;
+  }
+
+  function epochLastMintKtF1(uint256) external pure returns (uint256) {
+    return 0;
+  }
 
   /* ========== Mock Functions ========== */
 

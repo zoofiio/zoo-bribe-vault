@@ -64,15 +64,15 @@ export async function deployContractsFixture() {
     await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
   );
-  const iBGTVault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
+  const vault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
 
-  let trans = await protocol.connect(Alice).addVault(await iBGTVault.getAddress());
+  let trans = await protocol.connect(Alice).addVault(await vault.getAddress());
   await trans.wait();
 
   return { 
     Alice, Bob, Caro, Dave,
     protocol, settings, stakingPool,
-    iBGT, stETH, vaultCalculator, iBGTVault
+    iBGT, stETH, vaultCalculator, vault
   };
 }
 
@@ -137,7 +137,7 @@ export const makeToken = async (protocol: string, name: string, symbol: string, 
   return erc20
 };
 
-export interface SwapResult {
+export interface SwapResultF0 {
   deltaT: number;
   D: number;
   T: number;
@@ -160,8 +160,8 @@ export interface SwapResult {
   Y: number;
 }
 
-export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) {
-  const result: SwapResult = {
+export async function expectedSwapForYTokensF0(vault: Vault, assetAmount: number) {
+  const result: SwapResultF0 = {
     deltaT: 0, D: 0, T: 0, t: 0, t0: 0, M: 0, S: 0, e1: 0, e2: 0,
     APRi: 0, APRl: 0, a: 0, P_floor_scaled: 0, P_scaled: 0,
     A: 0, B: 0, C: 0, X: 0, Y: 0,
@@ -177,24 +177,24 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
   // const D = ethers.formatUnits(await vault.paramValue("D"), SETTINGS_DECIMALS);
   // let D, M, S, t0, deltaT;
   result.D = Number(await vault.paramValue(encodeBytes32String("D")));
-  console.log(`expectedSwapForYTokens, D: ${result.D}`);
+  console.log(`expectedSwapForYTokensF0, D: ${result.D}`);
   const epoch = await vault.epochInfoById(epochId);
   if (epoch.startTime + epoch.duration >= await time.latest()) {
     // in current epoch
     result.M = Number(formatUnits(await vault.yTokenTotalSupply(epochId), yTokenDecimals));
     result.S = Number(formatUnits(await vault.yTokenUserBalance(epochId, await vault.getAddress()), yTokenDecimals));
     result.t0 = Number(epoch.startTime);
-    console.log(`expectedSwapForYTokens, current epoch, M: ${result.M}, S: ${result.S}, t0: ${result.t0}`);
+    console.log(`expectedSwapForYTokensF0, current epoch, M: ${result.M}, S: ${result.S}, t0: ${result.t0}`);
 
-    if (await vault.epochLastSwapTimestamp(epochId) > 0) {
-      result.deltaT = (await time.latest()) - Number(await vault.epochLastSwapTimestamp(epochId));
+    if (await vault.epochLastSwapTimestampF0(epochId) > 0) {
+      result.deltaT = (await time.latest()) - Number(await vault.epochLastSwapTimestampF0(epochId));
       firstEpochSwap = false;
-      epochLastSwapPriceScaled = Number(await vault.epochLastSwapPriceScaled(epochId));
+      epochLastSwapPriceScaled = Number(await vault.epochLastSwapPriceScaledF0(epochId));
     } else {
       result.deltaT = (await time.latest()) - Number(epoch.startTime);
     }
     epochEndTime = Number(epoch.startTime + epoch.duration);
-    console.log(`expectedSwapForYTokens, current epoch, deltaT: ${result.deltaT}`);
+    console.log(`expectedSwapForYTokensF0, current epoch, deltaT: ${result.deltaT}`);
   }
   else {
     // in a new epoch
@@ -204,22 +204,22 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
     result.deltaT = 0;
     epochEndTime = await time.latest() + result.D;
 
-    console.log(`expectedSwapForYTokens, new epoch, M: ${result.M}, S: ${result.S}, t0: ${result.t0}, deltaT: ${result.deltaT}`);
+    console.log(`expectedSwapForYTokensF0, new epoch, M: ${result.M}, S: ${result.S}, t0: ${result.t0}, deltaT: ${result.deltaT}`);
   }
 
   result.T = Number(await vault.paramValue(encodeBytes32String("T")));
   result.t = await time.latest();
   result.e1 = Number(await vault.paramValue(encodeBytes32String("e1")));
   result.e2 = Number(await vault.paramValue(encodeBytes32String("e2")));
-  console.log(`expectedSwapForYTokens, T: ${result.T}, t: ${result.t}`);
-  console.log(`expectedSwapForYTokens, e1: ${result.e1}, e2: ${result.e2}`);
+  console.log(`expectedSwapForYTokensF0, T: ${result.T}, t: ${result.t}`);
+  console.log(`expectedSwapForYTokensF0, e1: ${result.e1}, e2: ${result.e2}`);
 
   // let APRi, APRl, a;
   if (firstEpochSwap) {
     // a = APRi * D / 365
     result.APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
     result.a = result.APRi * result.D / (365 * ONE_DAY_IN_SECS);
-    console.log(`expectedSwapForYTokens, first swap of epoch, APRi: ${result.APRi}, a: ${result.a}`);
+    console.log(`expectedSwapForYTokensF0, first swap of epoch, APRi: ${result.APRi}, a: ${result.a}`);
   }
   else {
     // a = P / (1 + e1 * (M - S) / M)
@@ -227,13 +227,13 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
     result.a = epochLastSwapPriceScaled / (10 ** 28) / (
       1 + result.e1 * (result.M - result.S) / result.M
     );
-    console.log(`expectedSwapForYTokens, not first swap of epoch, a: ${result.a}`);
+    console.log(`expectedSwapForYTokensF0, not first swap of epoch, a: ${result.a}`);
   }
 
   // P(L(t)) = APRl * (ED - t) / 365
   result.APRl = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRl")), SETTINGS_DECIMALS));
   const P_floor_scaled = result.APRl * (epochEndTime - result.t) / (365 * ONE_DAY_IN_SECS);
-  console.log(`expectedSwapForYTokens, APRl: ${result.APRl}, P_floor_scaled: ${P_floor_scaled}`);
+  console.log(`expectedSwapForYTokensF0, APRl: ${result.APRl}, P_floor_scaled: ${P_floor_scaled}`);
 
   /**
    * P(S,t) = a * (
@@ -248,7 +248,7 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
       result.T * (1 + (result.M - result.S) / (result.e2 * result.M))
     )
   );
-  console.log(`expectedSwapForYTokens, P_scaled: ${P_scaled}`);
+  console.log(`expectedSwapForYTokensF0, P_scaled: ${P_scaled}`);
 
   const useFloorPrice = P_scaled < P_floor_scaled;
   if (useFloorPrice) {
@@ -260,12 +260,12 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
     result.a = P_floor_scaled / (
       (1 + result.e1 * (result.M - result.S) / result.M) 
     );
-    console.log(`expectedSwapForYTokens, useFloorPrice, a: ${result.a}`);
+    console.log(`expectedSwapForYTokensF0, useFloorPrice, a: ${result.a}`);
   }
 
   // A = a / M
   result.A = result.a / result.M;  // scale: 10 ** (10 + 18)
-  console.log(`expectedSwapForYTokens, A: ${result.A}`);
+  console.log(`expectedSwapForYTokensF0, A: ${result.A}`);
 
   /**
    * B = a * deltaT / (
@@ -275,17 +275,17 @@ export async function expectedSwapForYTokens(vault: Vault, assetAmount: number) 
   result.B = result.a * result.deltaT / (
     result.T * (1 + (result.M - result.S) / (result.e2 * result.M))
   ) - result.a - result.e1 * result.a;
-  console.log(`expectedSwapForYTokens, B: ${result.B}`);
+  console.log(`expectedSwapForYTokensF0, B: ${result.B}`);
 
   // C = X
   result.C = assetAmount;
-  console.log(`expectedSwapForYTokens, C: ${result.C}`);
+  console.log(`expectedSwapForYTokensF0, C: ${result.C}`);
 
   /**
    * Y(X) = (B + sqrt(B * B + 4 * A * C)) / (2 * A)
    */
   result.Y = (result.B + Math.sqrt(result.B * result.B + 4 * result.A * result.C)) / (2 * result.A);
-  console.log(`expectedSwapForYTokens, Y: ${result.Y}`);
+  console.log(`expectedSwapForYTokensF0, Y: ${result.Y}`);
 
   return result.Y;
 }

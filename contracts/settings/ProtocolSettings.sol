@@ -30,8 +30,8 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
   constructor(address _protocol_, address _treasury_) ProtocolOwner(_protocol_) {
     _treasury = _treasury_;
 
-    // Epoch duration. Default to 15 days, [1 day, 2 year]
-    _upsertParamConfig("D", 15 days, 1 days, 730 days);
+    // Epoch duration. Default to 15 days, [1 hour, 5 year]
+    _upsertParamConfig("D", 15 days, 1 hours, 1825 days);
     // Initial APR. Default to 200%, [1%, 1000%]
     _upsertParamConfig("APRi", 2 * 10 ** 10, 10 ** 8, 10 ** 11);
     // Floor ARP. Default to 5%, [0%, 100%]
@@ -42,13 +42,14 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
     _upsertParamConfig("e1", 2, 1, 100);
     // Slope factor. Default to 2, [0, 100]
     _upsertParamConfig("e2", 2, 1, 100);
+
+    // Swap formula. Default to 1, [0, 1]
+    _upsertParamConfig("SwapF", 1, 0, 1);
+
     // Redemption fee. Default to 0.5%, [0%, 10%]
     _upsertParamConfig("f1", 5 * 10 ** 7, 0, 10 ** 9);
     // Commission rate. Default to 2%, [0%, 50%]
     _upsertParamConfig("f2", 2 * 10 ** 8, 0, 5 * 10 ** 9);
-
-
-
   }
 
   /* ============== VIEWS =============== */
