@@ -91,11 +91,7 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function epochLastSwapTimestampF1(uint256) external pure returns (uint256) {
-    return 0;
-  }
-
-  function epochLastMintKtF1(uint256) external pure returns (uint256) {
+  function epochNextSwapK0(uint256) external pure returns (uint256) {
     return 0;
   }
 

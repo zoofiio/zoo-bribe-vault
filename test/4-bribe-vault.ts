@@ -3,8 +3,12 @@ import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
-import { deployContractsFixture, ONE_DAY_IN_SECS, expectedSwapForYTokensF0, expectBigNumberEquals, makeToken } from './utils';
+import { 
+  deployContractsFixture, ONE_DAY_IN_SECS, expectedSwapForYTokensF0, expectBigNumberEquals, makeToken,
+  expectedNextSwapK0, expectedUpdateNextSwapK0, expectedCalcSwap
+} from './utils';
 import { RedeemPool__factory, PToken__factory } from "../typechain";
+import { formatUnits, parseUnits } from 'ethers';
 
 const { provider } = ethers;
 
@@ -210,40 +214,44 @@ describe('Bribe Vault', () => {
     await expect(iBGT.connect(Alice).mint(Caro.address, ethers.parseUnits("1000000", await iBGT.decimals()))).not.to.be.reverted;
 
     // First deposit automaticaly starts a new epoch.
-    // Alice deposits 1000 $iBGT, Bob deposits 500 $iBGT
+    // Alice deposits 1000 $iBGT
     const genesisTime = await time.latest();
     let aliceDepositAmount = ethers.parseUnits("1000", await iBGT.decimals());
     await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceDepositAmount)).not.to.be.reverted;
     await expect(vault.connect(Alice).deposit(aliceDepositAmount)).not.to.be.reverted;
-    let bobDepositAmount = ethers.parseUnits("500", await iBGT.decimals());
-    await expect(iBGT.connect(Bob).approve(await vault.getAddress(), bobDepositAmount)).not.to.be.reverted;
-    await expect(vault.connect(Bob).deposit(bobDepositAmount)).not.to.be.reverted;
 
+    let epochId = 1;
+    let expectedK0 = await expectedNextSwapK0(vault, 1000);
+    let actualK0 = await vault.epochNextSwapK0(epochId);
+    expectBigNumberEquals(parseUnits(expectedK0+"", 18 + 18 + 10), actualK0);
 
-    // // Total deposit: 
-    // //   Alice 1000 $iBGT; Bob 500 $iBGT
-    // // 3 days later, Alice 'swap' 150 $iBGT for yiBGT. => $piBGT is rebased by 150/1500 = 10%
-    // await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
-    // let aliceSwapAmount = ethers.parseUnits("1", await iBGT.decimals());
-    // let aliceExpectedYTokenAmount = await expectedSwapForYTokensF0(vault, 1);  // 955.248658753
-    // let aliceActualSwapForYTokenResult = await vault.calcSwapResultF0(aliceSwapAmount);
-    // expectBigNumberEquals(ethers.parseUnits(aliceExpectedYTokenAmount+'', await iBGT.decimals()), aliceActualSwapForYTokenResult.Y);
-    // await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
-    // trans = await vault.connect(Alice).swap(aliceSwapAmount);
-    // await expect(trans).to.changeTokenBalances(
-    //   iBGT,
-    //   [Alice.address, await stakingPool.getAddress()],
-    //   [-aliceSwapAmount, aliceSwapAmount]
-    // );
-    // await expect(trans)
-    //   .to.emit(piBGT, "Rebased").withArgs(aliceSwapAmount)
-    //   // .to.emit(vault, "YTokenDummyMinted").withArgs(currentEpochId, Alice.address, aliceSwapAmount, anyValue)
-    //   .to.emit(vault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, 0, aliceSwapAmount, anyValue);
+    // 1 hour later, Bob swaps 10 $iBGT for yTokens
+    await time.increaseTo(genesisTime + 3600);
+    let swapAssetAmount = ethers.parseUnits("10", await iBGT.decimals());
+    let expectedYTokenAmount = await expectedCalcSwap(vault, 10);  // 32.670532239252
+    let actualYTokenAmount = await vault.calcSwapResult(swapAssetAmount);
+    expectBigNumberEquals(parseUnits(expectedYTokenAmount+"", 18), actualYTokenAmount);
 
-    // const swapTimestamp = (await provider.getBlock(trans.blockHash!))?.timestamp;
-    // expectBigNumberEquals(aliceActualSwapForYTokenResult.P_floor_scaled, await vault.epochLastSwapPriceScaledF0(currentEpochId));
-    // expectBigNumberEquals(BigInt(swapTimestamp!), await vault.epochLastSwapTimestampF0(currentEpochId));
-    
+    await expect(iBGT.connect(Bob).approve(await vault.getAddress(), swapAssetAmount)).not.to.be.reverted;
+    let trans = await vault.connect(Bob).swap(swapAssetAmount);
+    await expect(trans).to.changeTokenBalances(iBGT, [Bob.address, await stakingPool.getAddress()], [-swapAssetAmount, swapAssetAmount]);
+    await expect(trans)
+      .to.emit(piBGT, "Rebased").withArgs(swapAssetAmount)
+      .to.emit(vault, "Swap").withArgs(epochId, Bob.address, swapAssetAmount, 0, swapAssetAmount, anyValue);
+
+    // k not changed.
+    let yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
+    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 967.372461614660721892
+    console.log(`k0: ${await vault.epochNextSwapK0(epochId)}`);
+
+    // 1 day later, Bob swaps another 100 $iBGT for yTokens
+    console.log("\n========= Bob Swaps 100 $iBGT for YTokens ===============");
+    await time.increaseTo(genesisTime + 3600 * 10);
+    swapAssetAmount = ethers.parseUnits("100", await iBGT.decimals());
+    expectedYTokenAmount = await expectedCalcSwap(vault, 100);  //
+    actualYTokenAmount = await vault.calcSwapResult(swapAssetAmount);
+    expectBigNumberEquals(parseUnits(expectedYTokenAmount+"", 18), actualYTokenAmount);
+
 
 
 

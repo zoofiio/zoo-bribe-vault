@@ -35,8 +35,6 @@ interface IVault {
 
   function epochLastSwapPriceScaledF0(uint256 epochId) external view returns (uint256);
 
-  function epochLastSwapTimestampF1(uint256 epochId) external view returns (uint256);
-
-  function epochLastMintKtF1(uint256 epochId) external view returns (uint256);
+  function epochNextSwapK0(uint256 epochId) external view returns (uint256);
 
 }

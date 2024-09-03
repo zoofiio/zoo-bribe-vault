@@ -167,23 +167,23 @@ library VaultCalculator {
     return result;
   }
 
-  function calcSwapK0(IVault self) public view returns (uint256) {
-    uint256 epochId = self.currentEpochId(); 
+  function calcNextSwapK0(IVault self, uint256 S) public view returns (uint256) {
     uint256 D = self.paramValue("D");
     uint256 APRi = self.paramValue("APRi");
 
-    uint256 S = self.yTokenUserBalance(epochId, address(this));
     uint256 X = S;
 
     // Y = S * APRi * D / 86400 / 365
     uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
     // k0 = X * Y
     uint256 k0 = X.mul(Y);   // scale: 10 ** 10
+
+    console.log("calcNextSwapK0, S: %s, Y: %s, k0: %s", S, Y, k0);
 
     return k0;
   }
 
-  function calcSwapKt(IVault self, uint256 m) public view returns (uint256) {
+  function updateNextSwapK0(IVault self, uint256 m) public view returns (uint256) {
     uint256 epochId = self.currentEpochId(); 
     uint256 D = self.paramValue("D");
     uint256 APRi = self.paramValue("APRi");
@@ -191,58 +191,82 @@ library VaultCalculator {
     uint256 S = self.yTokenUserBalance(epochId, address(this));
     uint256 X = S;
 
-    // Y = S * APRi * D / 86400 / 365
-    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-
-    // k'(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
-    uint256 k_t = X.add(m).mul(X.add(m)).mul(Y).div(X);   // scale: 10 ** 10
-
-    return k_t;
-  }
-
-  function doCalcSwapF1(IVault self, uint256 n) public view returns (uint256) {
-    uint256 epochId = self.currentEpochId();  // require epochId > 0
-    uint256 D = self.paramValue("D");
-    uint256 APRi = self.paramValue("APRi");
-    uint256 S = self.yTokenUserBalance(epochId, address(this));
-    uint256 X = S;
+    console.log("updateNextSwapK0, m: %s, S: %s, X: %s", m, S, X);
 
     // Y = S * APRi * D / 86400 / 365
     uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-    // k0 = X * Y
-    uint256 k0 = X.mul(Y);   // scale: 10 ** 10
+    console.log("updateNextSwapK0, Y: %s", Y);
 
+    // k''(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
+    uint256 k_t_updated = X.add(m).mul(X.add(m)).mul(Y).div(X);   // scale: 10 ** 10
+    console.log("updateNextSwapK0, k_t_updated: %s", k_t_updated);
+
+    // k'0 = k''t * (1 + ∆t / 86400) ^ 2
     uint256 deltaT = 0;
-    uint256 kt = k0;
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
       // in current epoch
-      if (self.epochLastSwapTimestampF1(epochId) > 0) {
-        deltaT = block.timestamp.sub(self.epochLastSwapTimestampF1(epochId));
-      } 
-      else {
-        deltaT = block.timestamp.sub(epoch.startTime);
-      }
-      if (self.epochLastMintKtF1(epochId) > 0) {
-        kt = self.epochLastMintKtF1(epochId);
-      } 
+      deltaT = block.timestamp.sub(epoch.startTime);
     } 
     else {
       // in a new epoch
       deltaT = 0;
     }
+    console.log("updateNextSwapK0, deltaT: %s", deltaT);
 
-    // k' = K'(t) * (1 + deltaT / 86400)^2
-    uint256 k = kt.mul(
+    uint256 k0 = k_t_updated.mul(
       SCALE + deltaT.mul(SCALE).div(86400)
-    ).mul(
+    ).div(SCALE).mul(
       SCALE + deltaT.mul(SCALE).div(86400)
     ).div(SCALE);   // scale: 10 ** 10
+    console.log("updateNextSwapK0, k0: %s", k0);
 
-    // m = X - k / (Y + n)
+    return k0;
+  }
+
+  function doCalcSwap(IVault self, uint256 n) public view returns (uint256) {
+    uint256 epochId = self.currentEpochId();  // require epochId > 0
+    uint256 D = self.paramValue("D");
+    uint256 APRi = self.paramValue("APRi");
+    uint256 S = self.yTokenUserBalance(epochId, address(this));
+    uint256 X = S;
+    console.log("doCalcSwap, X: %s", X);
+
+    // Y = S * APRi * D / 86400 / 365
+    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
+    console.log("doCalcSwap, Y: %s", Y);
+
+    uint256 k0 = self.epochNextSwapK0(epochId);
+    require(k0 > 0, "Invalid k0");
+    console.log("doCalcSwap, k0: %s", k0);
+
+    // kt = 1 * k0 / (1 + ∆t / 86400) ^ 2
+    uint256 deltaT = 0;
+    Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
+      // in current epoch
+      deltaT = block.timestamp.sub(epoch.startTime);
+    } 
+    else {
+      // in a new epoch
+      deltaT = 0;
+    }
+    console.log("doCalcSwap, deltaT: %s", deltaT);
+
+    uint256 kt = k0.mul(SCALE).div(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    ).mul(SCALE).div(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    );   // scale: 10 ** 10
+    console.log("doCalcSwap, kt: %s", kt);
+
+    // m = X - kt / (Y + n)
     uint256 m = X.sub(
-      k.div(Y.add(n)).div(10 ** Constants.PROTOCOL_DECIMALS)
+      kt.div(
+        Y.add(n.mul(10 ** Constants.PROTOCOL_DECIMALS))
+      )
     );
+    console.log("doCalcSwap, m: %s", m);
     return m;
   }
 

@@ -51,8 +51,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   mapping(uint256 => uint256) _epochLastSwapTimestampF0;
   mapping(uint256 => uint256) _epochLastSwapPriceF0;  // P(S,t)
 
-  mapping(uint256 => uint256) _epochLastSwapTimestampF1;
-  mapping(uint256 => uint256) _epochLastMintKtF1;
+  // mapping(uint256 => uint256) _epochLastSwapTimestampF1;
+  mapping(uint256 => uint256) _epochNextSwapK0;
 
   mapping(uint256 => EnumerableSet.AddressSet) internal _bribeTokens;  // epoch id => bribe tokens set
   mapping(uint256 => mapping(address => uint256)) internal _bribeTotalAmount;  // epoch id => (bribe token => total amount)
@@ -164,20 +164,16 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochLastSwapPriceF0[epochId];
   }
 
-  function epochLastSwapTimestampF1(uint256 epochId) public view returns (uint256) {
-    return _epochLastSwapTimestampF1[epochId];
-  }
-
-  function epochLastMintKtF1(uint256 epochId) public view returns (uint256) {
-    return _epochLastMintKtF1[epochId];
+  function epochNextSwapK0(uint256 epochId) public view returns (uint256) {
+    return _epochNextSwapK0[epochId];
   }
 
   function calcSwapResultF0(uint256 assetAmount) public view returns (Constants.SwapResultF0 memory) {
     return IVault(this).doCalcSwapF0(assetAmount);
   }
 
-  function calcSwapResultF1(uint256 assetAmount) public view returns (uint256) {
-    return IVault(this).doCalcSwapF1(assetAmount);
+  function calcSwapResult(uint256 assetAmount) public view returns (uint256) {
+    return IVault(this).doCalcSwap(assetAmount);
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
@@ -191,13 +187,21 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     uint256 pTokenSharesAmount = IPToken(_pToken).mint(_msgSender(), pTokenAmount);
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
-    // update k'(t)
+    // update k0
     uint256 yTokenAmount = amount;
-    if (_yTokenUserBalances[_currentEpochId.current()][address(this)] == 0) {
-      _epochLastMintKtF1[_currentEpochId.current()] = IVault(this).calcSwapK0();
+
+    // calculate initial k0 on epoch start
+    if (_epochNextSwapK0[_currentEpochId.current()] == 0) {
+      uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)];
+      // for epochs with no yToken carried from previous epoch, we are doing first deposit
+      if (S == 0) {
+        S = yTokenAmount;
+      }
+      _epochNextSwapK0[_currentEpochId.current()] = IVault(this).calcNextSwapK0(S);
     }
+    // update k0 on new deposit
     else {
-      _epochLastMintKtF1[_currentEpochId.current()] = IVault(this).calcSwapKt(yTokenAmount);
+      _epochNextSwapK0[_currentEpochId.current()] = IVault(this).updateNextSwapK0(yTokenAmount);
     }
 
     // mint yToken to Vault
@@ -242,7 +246,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
       _epochLastSwapPriceF0[_currentEpochId.current()] = useFloorPrice ? args.P_floor_scaled : args.P_scaled;
     }
     else {
-      yTokenAmount = calcSwapResultF1(netAmount);
+      yTokenAmount = calcSwapResult(netAmount);
     }
 
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yToken balance");
