@@ -31,9 +31,7 @@ interface IVault {
 
   function bribeTotalAmount(uint256 epochId, address bribeToken) external view returns (uint256);
 
-  function epochLastSwapTimestampF0(uint256 epochId) external view returns (uint256);
-
-  function epochLastSwapPriceScaledF0(uint256 epochId) external view returns (uint256);
+  function epochNextSwapX(uint256 epochId) external view returns (uint256);
 
   function epochNextSwapK0(uint256 epochId) external view returns (uint256);
 

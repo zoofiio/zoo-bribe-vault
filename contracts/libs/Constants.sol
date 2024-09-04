@@ -16,45 +16,6 @@ library Constants {
     address redeemPool;
   }
 
-  struct SwapResultF0 {
-    uint256 deltaT;
-    uint256 D;
-    uint256 T;
-    uint256 t;
-    uint256 t0;
-    uint256 M;
-    uint256 S;
-    uint256 e1;
-    uint256 e2;
-
-    uint256 APRi;
-    uint256 APRl;
-    uint256 a_scaled;
-    uint256 P_floor_scaled;
-    uint256 P_scaled;
-    bool P_scaled_positive;
-    uint256 A;
-    uint256 B;
-    uint256 C;
-    uint256 X;
-    uint256 Y;
-  }
-
-  // struct SwapResultF1 {
-  //   uint256 D;
-  //   uint256 APRi;
-  //   uint256 t;
-  //   uint256 t0;
-  //   uint256 deltaT;
-
-  //   uint256 k0;
-  //   uint256 S;
-  //   uint256 X;
-  //   uint256 Y;
-  //   uint256 n;
-  //   uint256 m;
-  // }
-
   struct BribeInfo {
     uint256 epochId;
     address bribeToken;

@@ -16,80 +16,70 @@ library VaultCalculator {
 
   uint256 public constant SCALE = 10 ** 18;
 
-  function calcNextSwapK0(IVault self, uint256 S) public view returns (uint256) {
+  function calcY(IVault self) public view returns (uint256) {
+    uint256 epochId = self.currentEpochId();
+
+    uint256 deltaT = 0;
+    Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
+      // in current epoch
+      deltaT = block.timestamp.sub(epoch.startTime);
+    } 
+    else {
+      // in a new epoch
+      deltaT = 0;
+    }
+
+    // Y = k0 / (X * (1 + ∆t / 86400)2) = k0 / X / (1 + ∆t / 86400) / (1 + ∆t / 86400)
+    uint256 X = self.epochNextSwapX(epochId);
+    require(X > 0, "Invalid X");
+    uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 10 ** 10
+    
+    uint256 Y = k0.mul(SCALE).mul(SCALE).div(X).div(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    ).div(
+      SCALE + deltaT.mul(SCALE).div(86400)
+    ).div(10 ** Constants.PROTOCOL_DECIMALS);
+
+    return Y;
+  }
+
+  function calcInitSwapParams(IVault self, uint256 S) public view returns (uint256, uint256) {
     uint256 D = self.paramValue("D");
     uint256 APRi = self.paramValue("APRi");
 
     uint256 X = S;
 
-    // Y = S * APRi * D / 86400 / 365
-    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-    // k0 = X * Y
-    uint256 k0 = X.mul(Y);   // scale: 10 ** 10
+    // Y0 = X * APRi * D / 86400 / 365
+    uint256 Y0 = X.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
 
-    console.log("calcNextSwapK0, S: %s, Y: %s, k0: %s", S, Y, k0);
+    // k0 = X * Y0
+    uint256 k0 = X.mul(Y0);   // scale: 10 ** 10
 
-    return k0;
+    return (X, k0);
   }
 
-  function updateNextSwapK0(IVault self, uint256 m) public view returns (uint256) {
+  function updateSwapParamsOnDeposit(IVault self, uint256 m) public view returns (uint256, uint256) {
     uint256 epochId = self.currentEpochId(); 
-    uint256 D = self.paramValue("D");
-    uint256 APRi = self.paramValue("APRi");
 
-    uint256 S = self.yTokenUserBalance(epochId, address(this));
-    uint256 X = S;
+    // X' = X + m
+    uint256 X = self.epochNextSwapX(epochId);
+    uint256 k0 = self.epochNextSwapK0(epochId);
+    uint256 X_updated = X.add(m);
+    console.log("updateSwapParamsOnDeposit, X: %s, k0: %s, X_updated: %s", X, k0, X_updated);
 
-    console.log("updateNextSwapK0, m: %s, S: %s, X: %s", m, S, X);
+    // k'0 = ((X + m) / X)^2 * k0 = (X + m) * (X + m) * k0 / X / X = X' * X' * k0 / X / X
+    uint256 k0_updated = X_updated.mul(X_updated).div(X).mul(k0).div(X);  // scale: 10 ** 10
+    console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated);
 
-    // Y = S * APRi * D / 86400 / 365
-    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-    console.log("updateNextSwapK0, Y: %s", Y);
-
-    // k''(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
-    uint256 k_t_updated = X.add(m).mul(X.add(m)).mul(Y).div(X);   // scale: 10 ** 10
-    console.log("updateNextSwapK0, k_t_updated: %s", k_t_updated);
-
-    // k'0 = k''t * (1 + ∆t / 86400) ^ 2
-    uint256 deltaT = 0;
-    Constants.Epoch memory epoch = self.epochInfoById(epochId);
-    if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
-      // in current epoch
-      deltaT = block.timestamp.sub(epoch.startTime);
-    } 
-    else {
-      // in a new epoch
-      deltaT = 0;
-    }
-    console.log("updateNextSwapK0, deltaT: %s", deltaT);
-
-    uint256 k0 = k_t_updated.mul(
-      SCALE + deltaT.mul(SCALE).div(86400)
-    ).div(SCALE).mul(
-      SCALE + deltaT.mul(SCALE).div(86400)
-    ).div(SCALE);   // scale: 10 ** 10
-    console.log("updateNextSwapK0, k0: %s", k0);
-
-    return k0;
+    return (X_updated, k0_updated);
   }
 
-  function doCalcSwap(IVault self, uint256 n) public view returns (uint256) {
-    uint256 epochId = self.currentEpochId();  // require epochId > 0
-    uint256 D = self.paramValue("D");
-    uint256 APRi = self.paramValue("APRi");
-    uint256 S = self.yTokenUserBalance(epochId, address(this));
-    uint256 X = S;
-    console.log("doCalcSwap, X: %s", X);
+  function doCalcSwap(IVault self, uint256 n) public view returns (uint256, uint256) {
+    uint256 epochId = self.currentEpochId();
+    uint256 X = self.epochNextSwapX(epochId);
+    uint256 k0 = self.epochNextSwapK0(epochId); // scale: 10 ** 10
 
-    // Y = S * APRi * D / 86400 / 365
-    uint256 Y = S.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-    console.log("doCalcSwap, Y: %s", Y);
-
-    uint256 k0 = self.epochNextSwapK0(epochId);
-    require(k0 > 0, "Invalid k0");
-    console.log("doCalcSwap, k0: %s", k0);
-
-    // kt = 1 * k0 / (1 + ∆t / 86400) ^ 2
     uint256 deltaT = 0;
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
@@ -100,23 +90,37 @@ library VaultCalculator {
       // in a new epoch
       deltaT = 0;
     }
-    console.log("doCalcSwap, deltaT: %s", deltaT);
+    console.log("doCalcSwap, X: %s, k0: %s, deltaT: %s", X, k0, deltaT);
 
-    uint256 kt = k0.mul(SCALE).div(
-      SCALE + deltaT.mul(SCALE).div(86400)
-    ).mul(SCALE).div(
-      SCALE + deltaT.mul(SCALE).div(86400)
-    );   // scale: 10 ** 10
-    console.log("doCalcSwap, kt: %s", kt);
+    // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
 
-    // m = X - kt / (Y + n)
-    uint256 m = X.sub(
-      kt.div(
-        Y.add(n.mul(10 ** Constants.PROTOCOL_DECIMALS))
-      )
-    );
+    Constants.Terms memory T;
+    T.T1 = SCALE.add(
+      deltaT.mul(SCALE).div(86400)
+    );  // scale: 18
+    console.log("doCalcSwap, T1: %s", T.T1);
+
+    // console.log("doCalSwap, X.mul(n).mul(T.T1): %s", X.mul(n).mul(T.T1));
+    // console.log("doCalSwap, X.mul(n).mul(T.T1).mul(T.T1): %s", X.mul(n).mul(T.T1).mul(T.T1));
+
+    // X * n * (1 + ∆t / 86400)2
+    T.T2 = X.mul(n).mul(T.T1).div(SCALE).mul(T.T1);   // scale: 18
+    console.log("doCalcSwap, T2: %s", T.T2);
+
+    // k0 + X * n * (1 + ∆t / 86400)2
+    T.T3 = k0.mul(SCALE).div(10 ** Constants.PROTOCOL_DECIMALS).add(T.T2).div(SCALE);   // scale: 1
+    console.log("doCalcSwap, T.T3: %s", T.T3);
+
+    // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
+    uint256 X_updated = X.mul(k0).div(10 ** Constants.PROTOCOL_DECIMALS).div(T.T3);
+    console.log("doCalcSwap, X_updated: %s", X_updated);
+
+    // m = X - X'
+    uint256 m = X.sub(X_updated);
+
     console.log("doCalcSwap, m: %s", m);
-    return m;
+
+    return (X_updated, m);
   }
 
   function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  

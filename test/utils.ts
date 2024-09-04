@@ -137,63 +137,11 @@ export const makeToken = async (protocol: string, name: string, symbol: string, 
   return erc20
 };
 
-export interface SwapResultF0 {
-  deltaT: number;
-  D: number;
-  T: number;
-  t: number;
-  t0: number;
-  M: number;
-  S: number;
-  e1: number;
-  e2: number;
-
-  APRi: number;
-  APRl: number;
-  a: number;
-  P_floor_scaled: number;
-  P_scaled: number;
-  A: number;
-  B: number;
-  C: number;
-  X: number;
-  Y: number;
-}
-
-export async function expectedNextSwapK0(vault: Vault, S: number) {
-  const D = Number(await vault.paramValue(encodeBytes32String("D")));
-  const APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
-
-  const X = S;
-
-  // Y = S * APRi * D / 86400 / 365
-  const Y = S * APRi * D / 86400 / 365;
-  // k0 = X * Y
-  const k0 = X * Y; 
-
-  console.log(`expectedNextSwapK0, D: ${D}, APRi: ${APRi}, S: ${S}, X: ${X}, Y: ${Y}, k0: ${k0}`);
-
-  return k0;
-}
-
-export async function expectedUpdateNextSwapK0(vault: Vault, m: number) {
+export async function expectedY(vault: Vault) {
   const epochId = await vault.currentEpochId(); 
-  const D = Number(await vault.paramValue(encodeBytes32String("D")));
-  const APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
 
-  const S_BN = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-  const S = Number(formatUnits(S_BN, 18));
-  const X = S;
-
-  // Y = S * APRi * D / 86400 / 365
-  const Y = S * APRi * D / 86400 / 365;   // scale: 10 ** 10
-
-  // k'(t) = (X + m) * Y * (X + m) / X = (X + m) * (X + m) * Y / X
-  const k_t_updated = (X + m) * (X + m) * Y / X   // scale: 10 ** 10
-
-  // k'0 = k''t * (1 + ∆t / 86400) ^ 2
-  let deltaT = 0;
   const epoch = await vault.epochInfoById(epochId);
+  let deltaT = 0;
   if (epoch.startTime + epoch.duration >= await time.latest()) {
     // in current epoch
     deltaT = (await time.latest()) - Number(epoch.startTime);
@@ -202,33 +150,54 @@ export async function expectedUpdateNextSwapK0(vault: Vault, m: number) {
     // in a new epoch
     deltaT = 0;
   }
-  console.log(`expectedUpdateNextSwapK0, deltaT: ${deltaT}`);
 
-  let k0 = k_t_updated * (1 + deltaT / 86400) * (1 + deltaT / 86400);   // scale: 10 ** 10
-  console.log(`expectedUpdateNextSwapK0, k0: ${k0}`);
+  // Y = k0 / (X * (1 + ∆t / 86400)2)
+  let X = Number(await vault.epochNextSwapX(epochId));
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** 10);
+  let Y = k0 / (X * (1 + deltaT / 86400) * (1 + deltaT / 86400));
 
-  return k0;
+  return Y;
+}
+
+export async function expectedInitSwapParams(vault: Vault, S: number) {
+  const D = Number(await vault.paramValue(encodeBytes32String("D")));
+  const APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
+
+  const X = S;
+
+  // Y0 = X * APRi * D / 86400 / 365
+  const Y0 = X * APRi * D / 86400 / 365;
+
+  // k0 = X * Y0
+  const k0 = X * Y0; 
+
+  console.log(`expectedInitSwapParams, D: ${D}, APRi: ${APRi}, S: ${S}, X: ${X}, Y0: ${Y0}, k0: ${k0}`);
+
+  return { X, k0 };
+}
+
+export async function expectedSwapParamsOnDeposit(vault: Vault, m: number) {
+  const epochId = await vault.currentEpochId(); 
+
+  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** 18);
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18 + 10));
+
+  let X_updated = X;
+
+  // k'0 = ((X + m) / X)2 * k0
+  let k0_updated = ((X + m) / X) * ((X + m) / X) * k0;
+
+  return { X_updated, k0_updated };
 }
 
 export async function expectedCalcSwap(vault: Vault, n: number) {
   const epochId = await vault.currentEpochId();  // require epochId > 0
-  const D = Number(await vault.paramValue(encodeBytes32String("D")));
-  const APRi = Number(formatUnits(await vault.paramValue(encodeBytes32String("APRi")), SETTINGS_DECIMALS));
 
-  const S_BN = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-  const S = Number(formatUnits(S_BN, 18));
-  const X = S;
-  console.log(`expectedCalcSwap, X: ${X}`);
+  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** 18);
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18 + 10));
 
-  // Y = S * APRi * D / 86400 / 365
-  const Y = S * APRi * D / 86400 / 365;   // scale: 10 ** 10
-  console.log(`expectedCalcSwap, Y: ${Y}`);
-
-  const k0 = Number(await vault.epochNextSwapK0(epochId)) / 10 ** (18 + 18 + 10);
-  console.log(`expectedCalcSwap, k0: ${k0}`);
-
-  let deltaT: number = 0;
   const epoch = await vault.epochInfoById(epochId);
+  let deltaT = 0;
   if (epoch.startTime + epoch.duration >= await time.latest()) {
     // in current epoch
     deltaT = (await time.latest()) - Number(epoch.startTime);
@@ -237,13 +206,15 @@ export async function expectedCalcSwap(vault: Vault, n: number) {
     // in a new epoch
     deltaT = 0;
   }
+  console.log(`expectedCalcSwap, X: ${X}, k0: ${k0}, deltaT: ${deltaT}`);
 
-  // kt = 1 * k0 / (1 + ∆t / 86400) ^ 2
-  const kt = k0 / (1 + deltaT / 86400) / (1 + deltaT / 86400);   // scale: 10 ** 10
-  console.log(`expectedCalcSwap, kt: ${kt}`);
+  // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
+  let X_updated = X * k0 / (k0 + X * n * (1 + deltaT / 86400) * (1 + deltaT / 86400));
 
-  // m = X - k / (Y + n)
-  const m = X - kt / (Y + n);   // scale: 10 ** 10
-  console.log(`expectedCalcSwap, m: ${m}`);
-  return m;
+  // m = X - X'
+  let m = X - X_updated;
+
+  console.log(`expectedCalcSwap, X_updated: ${X_updated}, m: ${m}`);
+
+  return { X_updated, m };
 }
