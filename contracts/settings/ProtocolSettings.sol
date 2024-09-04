@@ -43,9 +43,6 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
     // Slope factor. Default to 2, [0, 100]
     _upsertParamConfig("e2", 2, 1, 100);
 
-    // Swap formula. Default to 1, [0, 1]
-    _upsertParamConfig("SwapF", 1, 0, 1);
-
     // Redemption fee. Default to 0.5%, [0%, 10%]
     _upsertParamConfig("f1", 5 * 10 ** 7, 0, 10 ** 9);
     // Commission rate. Default to 2%, [0%, 50%]

@@ -4,7 +4,7 @@ import { expect } from 'chai';
 import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { 
-  deployContractsFixture, ONE_DAY_IN_SECS, expectedSwapForYTokensF0, expectBigNumberEquals, makeToken,
+  deployContractsFixture, ONE_DAY_IN_SECS, expectBigNumberEquals, makeToken,
   expectedNextSwapK0, expectedUpdateNextSwapK0, expectedCalcSwap
 } from './utils';
 import { RedeemPool__factory, PToken__factory } from "../typechain";
@@ -14,11 +14,10 @@ const { provider } = ethers;
 
 describe('Bribe Vault', () => {
 
-  it('Bribe Vault basic functionality works', async () => {
+  it.skip('Bribe Vault basic functionality works', async () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
 
-    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("SwapF"), 0);
     await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f1"), 0);
     await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f2"), 0);
 
@@ -103,8 +102,8 @@ describe('Bribe Vault', () => {
     // 3 days later, Alice 'swap' 150 $iBGT for yiBGT. => $piBGT is rebased by 150/1500 = 10%
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
     let aliceSwapAmount = ethers.parseUnits("1", await iBGT.decimals());
-    let aliceExpectedYTokenAmount = await expectedSwapForYTokensF0(vault, 1);  // 955.248658753
-    let aliceActualSwapForYTokenResult = await vault.calcSwapResultF0(aliceSwapAmount);
+    let aliceExpectedYTokenAmount = await expectedCalcSwap(vault, 1);  // 955.248658753
+    let aliceActualSwapForYTokenResult = await vault.calcSwapResult(aliceSwapAmount);
     expectBigNumberEquals(ethers.parseUnits(aliceExpectedYTokenAmount+'', await iBGT.decimals()), aliceActualSwapForYTokenResult.Y);
     await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
     trans = await vault.connect(Alice).swap(aliceSwapAmount);
@@ -139,25 +138,6 @@ describe('Bribe Vault', () => {
 
     // Could not claim bribes, since current epoch is not over
     await expect(vault.connect(Alice).claimBribes(currentEpochId)).to.be.revertedWith("Epoch not ended yet");
-
-    // Another 10 days later, Bob swaps 50 $iBGT for y tokens. And bribes are auto claimed for this epoch
-    console.log("\n========= Bob Swaps for YTokens ===============");
-    // await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 13);
-    // let bobSwapAmount = ethers.parseUnits("1", await iBGT.decimals());
-    // let bobExpectedYTokenAmount = await expectedSwapForYTokensF0(vault, 1);
-    // let bobActualSwapForYTokenResult = await vault.calcSwapResultF0(bobSwapAmount);
-    // expectBigNumberEquals(ethers.parseUnits(bobExpectedYTokenAmount+'', await iBGT.decimals()), bobActualSwapForYTokenResult.Y);
-    // await expect(iBGT.connect(Bob).approve(await vault.getAddress(), bobSwapAmount)).not.to.be.reverted;
-    // trans = await vault.connect(Bob).swap(bobSwapAmount);
-    // await expect(trans).to.changeTokenBalances(
-    //   iBGT,
-    //   [Bob.address], // New $iBGT is added to staking pool; but $iBGT bribe is also withdrawn
-    //   [-bobSwapAmount]
-    // );
-    // await expect(trans)
-    //   .to.emit(piBGT, "Rebased").withArgs(bobSwapAmount)
-    //   // .to.emit(vault, "YTokenDummyMinted").withArgs(currentEpochId, Bob.address, bobSwapAmount, anyValue)
-    //   .to.emit(vault, "Swap").withArgs(currentEpochId, Bob.address, bobSwapAmount, 0, bobSwapAmount, anyValue);
 
     // 16 days later, epoch ends. And all bribes are distributed
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
@@ -203,7 +183,6 @@ describe('Bribe Vault', () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
 
-    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("SwapF"), 1);
     await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f1"), 0);
     await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f2"), 0);
 

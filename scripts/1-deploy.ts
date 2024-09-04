@@ -1,6 +1,5 @@
 import * as _ from "lodash";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
-import { FactoryOptions } from "@nomicfoundation/hardhat-ethers/types";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract } from "./hutils";
@@ -8,7 +7,6 @@ import {
   MockERC20__factory,
   ProtocolSettings__factory,
   ZooProtocol__factory,
-  Vault__factory,
   MockStakingPool__factory,
 } from "../typechain";
 
@@ -51,7 +49,7 @@ async function main() {
 
   const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
 
-  const vaultAddress = await deployContract("Vault", [
+  const iRedVaultAddress = await deployContract("Vault", [
     protocolAddress, protocolSettingsAddress, stakingPoolAddress,
     iREDAddress, "Zoo piRED", "piRED"
   ], "iRED_Vault", {
@@ -60,11 +58,27 @@ async function main() {
     }
   });
 
-  const iREDVault = Vault__factory.connect(vaultAddress, deployer);
-
-  let trans = await protocol.connect(deployer).addVault(vaultAddress);
+  let trans = await protocol.connect(deployer).addVault(iRedVaultAddress);
   await trans.wait();
   console.log("Added iRED vault to protocol");
+
+  // Deploy $HONEY-USDC-LP vault
+  // https://bartio.beratrail.io/address/0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96
+  const honeyUsdcLPAddress = '0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96';
+  const honeyUsdcStakingPoolAddress = '0x675547750F4acdf64eD72e9426293f38d8138CA8';
+
+  const honeyUsdcLPVaultAddress = await deployContract("Vault", [
+    protocolAddress, protocolSettingsAddress, honeyUsdcStakingPoolAddress,
+    honeyUsdcLPAddress, "Zoo pHONEY-USDC-LP", "pHONEY-USDC-LP"
+  ], "HONEY-USDC-LP_Vault", {
+    libraries: {
+      VaultCalculator: vaultCalculatorAddress,
+    }
+  });
+
+  trans = await protocol.connect(deployer).addVault(honeyUsdcLPVaultAddress);
+  await trans.wait();
+  console.log("Added honeyUsdcLP vault to protocol");
 }
 
 // We recommend this pattern to be able to use async/await everywhere

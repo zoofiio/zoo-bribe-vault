@@ -168,10 +168,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     return _epochNextSwapK0[epochId];
   }
 
-  function calcSwapResultF0(uint256 assetAmount) public view returns (Constants.SwapResultF0 memory) {
-    return IVault(this).doCalcSwapF0(assetAmount);
-  }
-
   function calcSwapResult(uint256 assetAmount) public view returns (uint256) {
     return IVault(this).doCalcSwap(assetAmount);
   }
@@ -235,20 +231,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     stakingPool.stake(pTokenAmount);
     IPToken(_pToken).rebase(pTokenAmount);
 
-    uint256 yTokenAmount = 0;
-    uint256 swapFormula = paramValue("SwapF");
-    if (swapFormula == 0) {
-      Constants.SwapResultF0 memory args = calcSwapResultF0(netAmount);
-      yTokenAmount = args.Y;
-      _epochLastSwapTimestampF0[_currentEpochId.current()] = block.timestamp;
-
-      bool useFloorPrice = (!args.P_scaled_positive) || (args.P_scaled < args.P_floor_scaled);
-      _epochLastSwapPriceF0[_currentEpochId.current()] = useFloorPrice ? args.P_floor_scaled : args.P_scaled;
-    }
-    else {
-      yTokenAmount = calcSwapResult(netAmount);
-    }
-
+    uint256 yTokenAmount = calcSwapResult(netAmount);
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yToken balance");
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].sub(yTokenAmount);
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()].add(yTokenAmount);
