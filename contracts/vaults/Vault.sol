@@ -308,14 +308,22 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     emit ClaimBribesUnpaused();
   }
 
-  // function updateStakingPool(address _stakingPool) external nonReentrant onlyOwner {
-  //   stakingPool = IStakingPool(_stakingPool);
-  // }
+  function addBribeToken(address bribeToken) external nonReentrant onlyOwner noneZeroAddress(bribeToken) {
+    uint256 epochId = _currentEpochId.current();
+    EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
+    bool added = epochBribeTokens.add(bribeToken);
+    if (added) {
+      emit BribeTokenAdded(epochId, bribeToken);
+    }
+  }
 
-  // function rescueFromStakingPool(uint256 amount, address recipient) external nonReentrant onlyOwner {
-  //   stakingPool.withdraw(amount);
-  //   TokensTransfer.transferTokens(address(_assetToken), address(this), recipient, amount);
-  // }
+  function addBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwner noneZeroAddress(bribeToken) noneZeroAmount(amount) {
+    uint256 epochId = _currentEpochId.current();
+
+    TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), amount);
+    _bribeTotalAmount[epochId][bribeToken] = _bribeTotalAmount[epochId][bribeToken].add(amount);
+    emit BribesAdded(epochId, bribeToken, amount);
+  }
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
@@ -392,8 +400,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
     for (uint256 i = 0; i < rewardTokens.length; i++) {
       address bribeToken = rewardTokens[i];
       uint256 newBribeTokenBalance = IERC20(bribeToken).balanceOf(address(this));
-      epochBribeTotalAmount[bribeToken] = epochBribeTotalAmount[bribeToken].add(newBribeTokenBalance.sub(previousBribeTokenBalance[i]));
-      
+      uint256 bribesAdded = newBribeTokenBalance.sub(previousBribeTokenBalance[i]);
+      epochBribeTotalAmount[bribeToken] = epochBribeTotalAmount[bribeToken].add(bribesAdded);
+      emit BribesAdded(epochId, bribeToken, bribesAdded);
       console.log("epoch: %s, bribeToken: %s, total bribe amount: %s", epochId, bribeToken, epochBribeTotalAmount[bribeToken]);
     }
   }
@@ -470,5 +479,5 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
   event BribesClaimed(address indexed bribeToken, address indexed user, uint256 amount);
 
   event BribeTokenAdded(uint256 indexed epochId, address indexed bribeToken);
-
+  event BribesAdded(uint256 indexed epochId, address indexed bribeToken, uint256 amount);
 }

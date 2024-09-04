@@ -179,7 +179,7 @@ describe('Bribe Vault', () => {
     expectBigNumberEquals(expectedBobBribesBRB, actualBobBribes[1][2]);
   });
 
-  it.only('Swap works', async () => {
+  it('Swap works', async () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
 
