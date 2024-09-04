@@ -122,24 +122,12 @@ contract RedeemPool is Context, ReentrancyGuard {
   }
 
   // $iBGT
-  function claimAssetToken() public nonReentrant onlyAfterSettlement updateAssetAmount(_msgSender()) {
-    uint256 amount = _userAssetAmounts[_msgSender()];
-    if (amount > 0) {
-      _userAssetAmounts[_msgSender()] = 0;
+  function claimAssetToken() public {
+    _claimAssetToken(_msgSender());
+  }
 
-      IProtocolSettings settings = IProtocolSettings(_vault.settings());
-      uint256 fees = amount.mul(settings.vaultParamValue(address(_vault), "f1")).div(10 ** settings.decimals());
-      uint256 netAmount = amount.sub(fees);
-
-      if (netAmount > 0) {
-        TokensTransfer.transferTokens(_assetToken, address(this), _msgSender(), netAmount);
-      }
-      if (fees > 0) {
-        TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), fees);
-      }
-      
-      emit AssetTokenClaimed(_msgSender(), amount, netAmount, fees);
-    }
+  function claimAssetTokenFor(address account) external onlyVault {
+    _claimAssetToken(account);
   }
 
   function exit() external {
@@ -160,6 +148,29 @@ contract RedeemPool is Context, ReentrancyGuard {
       _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(assetAmount.mul(1e18).div(_totalRedeemingShares));
     }
     emit Settlement(assetAmount);
+  }
+
+  /* ================= INTERNAL Functions ================ */
+
+
+  function _claimAssetToken(address account) internal nonReentrant onlyAfterSettlement updateAssetAmount(account) {
+    uint256 amount = _userAssetAmounts[account];
+    if (amount > 0) {
+      _userAssetAmounts[account] = 0;
+
+      IProtocolSettings settings = IProtocolSettings(_vault.settings());
+      uint256 fees = amount.mul(settings.vaultParamValue(address(_vault), "f1")).div(10 ** settings.decimals());
+      uint256 netAmount = amount.sub(fees);
+
+      if (netAmount > 0) {
+        TokensTransfer.transferTokens(_assetToken, address(this), account, netAmount);
+      }
+      if (fees > 0) {
+        TokensTransfer.transferTokens(_assetToken, address(this), settings.treasury(), fees);
+      }
+      
+      emit AssetTokenClaimed(account, amount, netAmount, fees);
+    }
   }
 
   /* ========== MODIFIERS ========== */

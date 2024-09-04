@@ -267,6 +267,14 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner {
       }
     }
   }
+
+  function batchClaimRedeemAssets(uint256[] memory epochIds) external nonReentrant {
+    for (uint256 i = 0; i < epochIds.length; i++) {
+      Constants.Epoch memory epoch = _epochs[epochIds[i]];
+      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+      redeemPool.claimAssetTokenFor(_msgSender());
+    }
+  }
   
   /* ========== RESTRICTED FUNCTIONS ========== */
 
