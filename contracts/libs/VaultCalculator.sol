@@ -35,10 +35,11 @@ library VaultCalculator {
     require(X > 0, "Invalid X");
     uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 10 ** 10
     
+    uint256 decayPeriod = self.paramValue("D").div(30);
     uint256 Y = k0.mul(SCALE).mul(SCALE).div(X).div(
-      SCALE + deltaT.mul(SCALE).div(86400)
+      SCALE + deltaT.mul(SCALE).div(decayPeriod)
     ).div(
-      SCALE + deltaT.mul(SCALE).div(86400)
+      SCALE + deltaT.mul(SCALE).div(decayPeriod)
     ).div(10 ** Constants.PROTOCOL_DECIMALS);
 
     return Y;
@@ -94,9 +95,10 @@ library VaultCalculator {
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
 
+    uint256 decayPeriod = self.paramValue("D").div(30);
     Constants.Terms memory T;
     T.T1 = SCALE.add(
-      deltaT.mul(SCALE).div(86400)
+      deltaT.mul(SCALE).div(decayPeriod)
     );  // scale: 18
     console.log("doCalcSwap, T1: %s", T.T1);
 
@@ -129,15 +131,16 @@ library VaultCalculator {
     require(block.timestamp > epochEndTime, "Epoch not ended yet");
 
     uint256 yTokenBalanceSynthetic = self.yTokenUserBalanceSynthetic(epochId, account);
+    uint256 yTokenTotalSyntheticOfVault = self.yTokenUserBalanceSynthetic(epochId, address(self));
     uint256 yTokenTotalSynthetic = self.yTokenTotalSupplySynthetic(epochId);
-    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
+    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic + yTokenTotalSyntheticOfVault, "Invalid yToken balance");
 
     address[] memory epochBribeTokens = self.bribeTokens(epochId);
     Constants.BribeInfo[] memory bribeInfo = new Constants.BribeInfo[](epochBribeTokens.length);
     for (uint256 i = 0; i < epochBribeTokens.length; i++) {
       address bribeToken = epochBribeTokens[i];
       uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
-      uint256 bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic);
+      uint256 bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic.sub(yTokenTotalSyntheticOfVault));
       bribeInfo[i].epochId = epochId;
       bribeInfo[i].bribeToken = bribeToken;
       bribeInfo[i].bribeAmount = bribes;

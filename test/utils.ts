@@ -152,9 +152,10 @@ export async function expectedY(vault: Vault) {
   }
 
   // Y = k0 / (X * (1 + ∆t / 86400)2)
+  let decayPeriod = Number(await vault.paramValue(encodeBytes32String("D"))) / 30;
   let X = Number(await vault.epochNextSwapX(epochId));
   let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** 10);
-  let Y = k0 / (X * (1 + deltaT / 86400) * (1 + deltaT / 86400));
+  let Y = k0 / (X * (1 + deltaT / decayPeriod) * (1 + deltaT / decayPeriod));
 
   return Y;
 }
@@ -209,7 +210,8 @@ export async function expectedCalcSwap(vault: Vault, n: number) {
   console.log(`expectedCalcSwap, X: ${X}, k0: ${k0}, deltaT: ${deltaT}`);
 
   // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
-  let X_updated = X * k0 / (k0 + X * n * (1 + deltaT / 86400) * (1 + deltaT / 86400));
+  let decayPeriod = Number(await vault.paramValue(encodeBytes32String("D"))) / 30;
+  let X_updated = X * k0 / (k0 + X * n * (1 + deltaT / decayPeriod) * (1 + deltaT / decayPeriod));
 
   // m = X - X'
   let m = X - X_updated;

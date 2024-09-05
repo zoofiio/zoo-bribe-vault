@@ -34,14 +34,6 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
     _upsertParamConfig("D", 15 days, 1 hours, 1825 days);
     // Initial APR. Default to 200%, [1%, 1000%]
     _upsertParamConfig("APRi", 2 * 10 ** 10, 10 ** 8, 10 ** 11);
-    // Floor ARP. Default to 5%, [0%, 100%]
-    _upsertParamConfig("APRl", 5 * 10 ** 8, 0, 10 ** 10);
-    // Decay Time. Default to 1 day, [1 day, 30 days]
-    _upsertParamConfig("T", 1 days, 1 days, 30 days);
-    // Price variation factor. Default to 2, [1, 100]
-    _upsertParamConfig("e1", 2, 1, 100);
-    // Slope factor. Default to 2, [0, 100]
-    _upsertParamConfig("e2", 2, 1, 100);
 
     // Redemption fee. Default to 0.5%, [0%, 10%]
     _upsertParamConfig("f1", 5 * 10 ** 7, 0, 10 ** 9);

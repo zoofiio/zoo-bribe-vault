@@ -14,12 +14,12 @@ const { provider } = ethers;
 
 describe('Bribe Vault', () => {
 
-  it.skip('Bribe Vault basic functionality works', async () => {
+  it('Bribe Vault basic E2E works', async () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
 
-    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f1"), 0);
-    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f2"), 0);
+    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f1"), 10 ** 9); // 10%
+    await settings.connect(Alice).updateVaultParamValue(await vault.getAddress(), ethers.encodeBytes32String("f2"), 10 ** 9); // 10%
 
     await expect(iBGT.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await iBGT.decimals()))).not.to.be.reverted;
     await expect(iBGT.connect(Alice).mint(Bob.address, ethers.parseUnits("1000000", await iBGT.decimals()))).not.to.be.reverted;
@@ -99,27 +99,27 @@ describe('Bribe Vault', () => {
 
     // Total deposit: 
     //   Alice 1000 $iBGT; Bob 500 $iBGT
-    // 3 days later, Alice 'swap' 150 $iBGT for yiBGT. => $piBGT is rebased by 150/1500 = 10%
+    // 3 days later, Alice 'swap' 100 $iBGT for yiBGT. => $piBGT is rebased by 100/1500
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
-    let aliceSwapAmount = ethers.parseUnits("1", await iBGT.decimals());
-    let aliceExpectedYTokenAmount = await expectedCalcSwap(vault, 1);  // 955.248658753
-    let aliceActualSwapForYTokenResult = await vault.calcSwapResult(aliceSwapAmount);
-    expectBigNumberEquals(ethers.parseUnits(aliceExpectedYTokenAmount+'', await iBGT.decimals()), aliceActualSwapForYTokenResult.Y);
+
+    let aliceSwapAmount = ethers.parseUnits("100", await iBGT.decimals());
+    let aliceExpectedSwapResult = await expectedCalcSwap(vault, 100);  // 1463.1851649850014
+    let aliceActualSwapResult = await vault.calcSwap(aliceSwapAmount);
+    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.X_updated + "", 18), aliceActualSwapResult[0]);
+    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.m + "", 18), aliceActualSwapResult[1]);
+
+    let fees = aliceSwapAmount * 10n / 100n;
+    let netSwapAmount = aliceSwapAmount - fees;
     await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceSwapAmount)).not.to.be.reverted;
     trans = await vault.connect(Alice).swap(aliceSwapAmount);
     await expect(trans).to.changeTokenBalances(
       iBGT,
-      [Alice.address, await stakingPool.getAddress()],
-      [-aliceSwapAmount, aliceSwapAmount]
+      [Alice.address, await settings.treasury(), await stakingPool.getAddress()],
+      [-aliceSwapAmount, fees, netSwapAmount]
     );
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(aliceSwapAmount)
-      // .to.emit(vault, "YTokenDummyMinted").withArgs(currentEpochId, Alice.address, aliceSwapAmount, anyValue)
-      .to.emit(vault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, 0, aliceSwapAmount, anyValue);
-
-    const swapTimestamp = (await provider.getBlock(trans.blockHash!))?.timestamp;
-    expectBigNumberEquals(aliceActualSwapForYTokenResult.P_floor_scaled, await vault.epochLastSwapPriceScaledF0(currentEpochId));
-    expectBigNumberEquals(BigInt(swapTimestamp!), await vault.epochLastSwapTimestampF0(currentEpochId));
+      .to.emit(piBGT, "Rebased").withArgs(netSwapAmount)
+      .to.emit(vault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, fees, netSwapAmount, anyValue);
     
     // No bribes now
     // console.log(ethers.formatUnits(await iBGT.balanceOf(Alice.address), await iBGT.decimals()));
@@ -131,11 +131,6 @@ describe('Bribe Vault', () => {
     await expect(stakingPool.connect(Alice).notifyRewardAmount(await iBGT.getAddress(), bribeAmountIBGT)).not.to.be.reverted;
     await expect(stakingPool.connect(Alice).notifyRewardAmount(await brbToken.getAddress(), bribeAmountBRB)).not.to.be.reverted;
 
-    // Bob could not claim bribes, since he did not have yTokens
-    expect(await vault.yTokenUserBalance(currentEpochId, Bob.address)).to.equal(0);
-    expect(await vault.yTokenUserBalanceSynthetic(currentEpochId, Bob.address)).to.equal(0);
-    await expect(vault.connect(Bob).claimBribes(currentEpochId)).to.be.revertedWith("No yToken balance");
-
     // Could not claim bribes, since current epoch is not over
     await expect(vault.connect(Alice).claimBribes(currentEpochId)).to.be.revertedWith("Epoch not ended yet");
 
@@ -146,8 +141,19 @@ describe('Bribe Vault', () => {
     let vaultBribesIBGTAmount = 0n;
     let vaultBribesBRBAmount = 0n;
 
-    // Check alice's bribes.
-    // Alice yToken balance: 11699.3876024; Bob yToken balance: 111673.028751; vault ytoken balance: ?
+    // Bob could not claim bribes, since he did not have yTokens
+    expect(await vault.yTokenUserBalance(currentEpochId, Bob.address)).to.equal(0);
+    expect(await vault.yTokenUserBalanceSynthetic(currentEpochId, Bob.address)).to.equal(0);
+    await expect(vault.connect(Bob).claimBribes(currentEpochId)).to.be.revertedWith("No yToken balance");
+
+    // Check YT balances
+    const aliceYTokenBalance = await vault.yTokenUserBalance(currentEpochId, Alice.address);
+    const bobYTokenBalance = await vault.yTokenUserBalance(currentEpochId, Bob.address);
+    const vaultYTokenBalance = await vault.yTokenUserBalance(currentEpochId, await vault.getAddress());
+    const totalYTokenBalance = await vault.yTokenTotalSupply(currentEpochId);
+    console.log(aliceYTokenBalance, bobYTokenBalance, totalYTokenBalance);
+    expectBigNumberEquals(aliceYTokenBalance + bobYTokenBalance + vaultYTokenBalance, totalYTokenBalance);
+
     const aliceYTokenBalanceSynthetic = await vault.yTokenUserBalanceSynthetic(currentEpochId, Alice.address);
     const bobYTokenBalanceSynthetic = await vault.yTokenUserBalanceSynthetic(currentEpochId, Bob.address);
     const vaultYTokenBalanceSynthetic = await vault.yTokenUserBalanceSynthetic(currentEpochId, await vault.getAddress());
@@ -155,11 +161,11 @@ describe('Bribe Vault', () => {
     console.log(aliceYTokenBalanceSynthetic, bobYTokenBalanceSynthetic, totalYTokenBalanceSynthetic);
     expectBigNumberEquals(aliceYTokenBalanceSynthetic + bobYTokenBalanceSynthetic + vaultYTokenBalanceSynthetic, totalYTokenBalanceSynthetic);
 
-    const expectedAliceBribesIBGT = vaultBribesIBGTAmount * aliceYTokenBalanceSynthetic / totalYTokenBalanceSynthetic;
-    const expectedBobBribesIBGT = vaultBribesIBGTAmount * bobYTokenBalanceSynthetic / totalYTokenBalanceSynthetic;
+    const expectedAliceBribesIBGT = vaultBribesIBGTAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
+    const expectedBobBribesIBGT = vaultBribesIBGTAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
 
-    const expectedAliceBribesBRB = vaultBribesBRBAmount * aliceYTokenBalanceSynthetic / totalYTokenBalanceSynthetic;
-    const expectedBobBribesBRB = vaultBribesBRBAmount * bobYTokenBalanceSynthetic / totalYTokenBalanceSynthetic;
+    const expectedAliceBribesBRB = vaultBribesBRBAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
+    const expectedBobBribesBRB = vaultBribesBRBAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
 
     const actualAliceBribes = await vault.calcBribes(currentEpochId, Alice.address);
     const actualBobBribes = await vault.calcBribes(currentEpochId, Bob.address);
@@ -209,7 +215,7 @@ describe('Bribe Vault', () => {
 
     await time.increaseTo(genesisTime + 3600);
     let swapAssetAmount = ethers.parseUnits("10", await iBGT.decimals());
-    let swapResult = await expectedCalcSwap(vault, 10);  // m = 116.61629168394245
+    let swapResult = await expectedCalcSwap(vault, 10);  // m = 124.93874956948082
     let actualResult = await vault.calcSwap(swapAssetAmount);
     expectBigNumberEquals(parseUnits(swapResult.X_updated + "", 18), actualResult[0]);
     expectBigNumberEquals(parseUnits(swapResult.m + "", 18), actualResult[1]);
@@ -224,7 +230,7 @@ describe('Bribe Vault', () => {
 
     // k0 not changed.
     let yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 883.379129656847083012
+    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 875.051905567315190927
     console.log(`k0 after swap: ${await vault.epochNextSwapK0(epochId)}`);
 
     // X is changed
@@ -234,7 +240,7 @@ describe('Bribe Vault', () => {
     console.log("\n========= Bob swaps 10 $iBGT for YTokens ===============");
     await time.increaseTo(genesisTime + 3600 * 10);
     swapAssetAmount = ethers.parseUnits("10", await iBGT.decimals());
-    swapResult = await expectedCalcSwap(vault, 10);  // 156.7337185553945
+    swapResult = await expectedCalcSwap(vault, 10);  // 230.59904938282182
     actualResult = await vault.calcSwap(swapAssetAmount);
     expectBigNumberEquals(parseUnits(swapResult.X_updated + "", 18), actualResult[0]);
     expectBigNumberEquals(parseUnits(swapResult.m + "", 18), actualResult[1]);
@@ -245,7 +251,7 @@ describe('Bribe Vault', () => {
 
     // k not changed.
     yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 726.641197780548471341
+    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 644.444278692315151251
     console.log(`k0: ${await vault.epochNextSwapK0(epochId)}`);
 
     // X is changed
@@ -259,13 +265,13 @@ describe('Bribe Vault', () => {
     await expect(vault.connect(Alice).deposit(aliceDepositAmount)).not.to.be.reverted;
 
     yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 826.641197780548471341
+    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 744.444278692315151251
     console.log(`k0: ${await vault.epochNextSwapK0(epochId)}`);
     console.log(`X after swap: ${await vault.epochNextSwapX(epochId)}`);
 
     console.log("\n========= Bob swaps 10 $iBGT for YTokens ===============");
     swapAssetAmount = ethers.parseUnits("10", await iBGT.decimals());
-    swapResult = await expectedCalcSwap(vault, 10);  // 747.1816268566819
+    swapResult = await expectedCalcSwap(vault, 10);  // 720.3778524226619
     actualResult = await vault.calcSwap(swapAssetAmount);
     expectBigNumberEquals(parseUnits(swapResult.X_updated + "", 18), actualResult[0]);
     expectBigNumberEquals(parseUnits(swapResult.m + "", 18), actualResult[1]);
@@ -275,10 +281,9 @@ describe('Bribe Vault', () => {
     await expect(trans).to.changeTokenBalances(iBGT, [Bob.address, await stakingPool.getAddress()], [-swapAssetAmount, swapAssetAmount]);
 
     yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
-    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 79.459268645043563979
+    console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);  // 24.066323587412834713
     console.log(`k0: ${await vault.epochNextSwapK0(epochId)}`);
     console.log(`X after swap: ${await vault.epochNextSwapX(epochId)}`);
-
 
     // 16 days later, Alice deposits 1000 $iBGT, and starts a new epoch
     console.log("\n========= Alice deposits 1000 $iBGT to start epoch 2 ===============");

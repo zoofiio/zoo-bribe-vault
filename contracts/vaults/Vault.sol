@@ -256,6 +256,10 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   }
 
   function claimBribes(uint256 epochId) external nonReentrant whenClaimBribesNotPaused validEpochId(epochId) {
+    Constants.Epoch memory epoch = epochInfoById(epochId);
+    uint256 epochEndTime = epoch.startTime.add(epoch.duration);
+    require(block.timestamp > epochEndTime, "Epoch not ended yet");
+
     uint256 yTokenBalanceSynthetic = _yTokenUserBalancesSynthetic[epochId][_msgSender()];
     require(yTokenBalanceSynthetic > 0, "No yToken balance");
     uint256 yTokenTotalSynthetic = _yTokenTotalSupplySynthetic[epochId];
@@ -367,16 +371,17 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     _epochs[epochId].startTime = block.timestamp;
     _epochs[epochId].duration = paramValue("D");
     _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
-    
+
     emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool);
 
-    // Y tokens virtually hold by the Vault, need move to new epoch
     if (oldEpochId  > 0) {
-      _yTokenTotalSupply[epochId] = _yTokenUserBalances[oldEpochId][address(this)];
-      _yTokenUserBalances[epochId][address(this)] = _yTokenUserBalances[oldEpochId][address(this)];
-
-      _yTokenTotalSupplySynthetic[epochId] = _yTokenUserBalancesSynthetic[oldEpochId][address(this)];
-      _yTokenUserBalancesSynthetic[epochId][address(this)] = _yTokenUserBalancesSynthetic[oldEpochId][address(this)];
+      uint256 yTokenAmount = IERC20(_pToken).totalSupply();
+      _yTokenTotalSupply[epochId] = yTokenAmount;
+      _yTokenUserBalances[epochId][address(this)] = yTokenAmount;
+      
+      uint256 yTokenAmountSynthetic = yTokenAmount.mul(_epochs[epochId].duration);
+      _yTokenTotalSupplySynthetic[epochId] = yTokenAmountSynthetic;
+      _yTokenUserBalancesSynthetic[epochId][address(this)] = yTokenAmountSynthetic;
     }
   }
 
