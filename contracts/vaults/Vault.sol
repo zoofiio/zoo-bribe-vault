@@ -220,7 +220,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].add(yTokenAmountSynthetic);
 
-
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
 
@@ -368,6 +367,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     _epochs[epochId].startTime = block.timestamp;
     _epochs[epochId].duration = paramValue("D");
     _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
+    
+    emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool);
 
     // Y tokens virtually hold by the Vault, need move to new epoch
     if (oldEpochId  > 0) {
@@ -487,6 +488,8 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   event SwapUnpaused();
   event ClaimBribesPaused();
   event ClaimBribesUnpaused();
+
+  event EpochStarted(uint256 epochId, uint256 startTime, uint256 duration, address redeemPool);
 
   event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
