@@ -134,17 +134,25 @@ describe('Bribe Vault', () => {
     // Could not claim bribes, since current epoch is not over
     await expect(vault.connect(Alice).claimBribes(currentEpochId)).to.be.revertedWith("Epoch not ended yet");
 
-    // 16 days later, epoch ends. And all bribes are distributed
-    await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
-    // let vaultBribesIBGTAmount = bribeAmountIBGT;
-    // let vaultBribesBRBAmount = bribeAmountBRB;
-    let vaultBribesIBGTAmount = 0n;
-    let vaultBribesBRBAmount = 0n;
+    // Another 11 days later, all bribes are distributed
+    await time.increase(ONE_DAY_IN_SECS * 11);
 
-    // Bob could not claim bribes, since he did not have yTokens
-    expect(await vault.yTokenUserBalance(currentEpochId, Bob.address)).to.equal(0);
-    expect(await vault.yTokenUserBalanceSynthetic(currentEpochId, Bob.address)).to.equal(0);
-    await expect(vault.connect(Bob).claimBribes(currentEpochId)).to.be.revertedWith("No yToken balance");
+    // Bob swap 10 $iBGT for yTokens, which triggers bribes claimed
+    console.log("\n========= Another 11 days later, Bob swaps 10 $iBGT for YTokens ===============");
+    let swapAssetAmount = ethers.parseUnits("10", await iBGT.decimals());
+    let swapResult = await expectedCalcSwap(vault, 10); 
+    let actualResult = await vault.calcSwap(swapAssetAmount);
+    expectBigNumberEquals(parseUnits(swapResult.X_updated + "", 18), actualResult[0]);
+    expectBigNumberEquals(parseUnits(swapResult.m + "", 18), actualResult[1]);
+    await expect(iBGT.connect(Bob).approve(await vault.getAddress(), swapAssetAmount)).not.to.be.reverted;
+    trans = await vault.connect(Bob).swap(swapAssetAmount);
+    await expect(trans).to.changeTokenBalances(iBGT, [Bob.address], [-swapAssetAmount]);
+
+    // 16 days later, epoch ends. And all bribes are distributed
+    console.log("\n========= 16 days later, check bribes ===============");
+    await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
+    let vaultBribesIBGTAmount = bribeAmountIBGT;
+    let vaultBribesBRBAmount = bribeAmountBRB;
 
     // Check YT balances
     const aliceYTokenBalance = await vault.yTokenUserBalance(currentEpochId, Alice.address);
