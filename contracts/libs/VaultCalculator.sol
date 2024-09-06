@@ -140,7 +140,11 @@ library VaultCalculator {
     for (uint256 i = 0; i < epochBribeTokens.length; i++) {
       address bribeToken = epochBribeTokens[i];
       uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
-      uint256 bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic.sub(yTokenTotalSyntheticOfVault));
+      uint256 bribes = 0;
+      if (totalRewards != 0 && yTokenBalanceSynthetic != 0) {
+        require(yTokenTotalSynthetic.sub(yTokenTotalSyntheticOfVault) > 0);
+        bribes = totalRewards.mul(yTokenBalanceSynthetic).div(yTokenTotalSynthetic.sub(yTokenTotalSyntheticOfVault));
+      }
       bribeInfo[i].epochId = epochId;
       bribeInfo[i].bribeToken = bribeToken;
       bribeInfo[i].bribeAmount = bribes;
