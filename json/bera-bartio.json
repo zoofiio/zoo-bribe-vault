@@ -26,11 +26,11 @@
     ]
   },
   "VaultCalculator": {
-    "address": "0x817c5d3B0F44d68bCf8612B11222c9A2683b8c03",
+    "address": "0x1fE8EefE878155B7F688c62570C78Bf0AD3B0877",
     "args": []
   },
   "iRED_Vault": {
-    "address": "0xD0f50De901bd0445dC04cA861B9D3D2b20a0f8C2",
+    "address": "0x266c951f80b1ef4479D9795281ed1b0ED95Eb747",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -41,14 +41,14 @@
     ]
   },
   "HONEY-USDC-LP_Vault": {
-    "address": "0xc37dF6905923574AeFEb2aED3Ea3546b4112433a",
+    "address": "0x6a6B9817d221816187aD335030b0EF7c17051EfA",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
       "0x675547750F4acdf64eD72e9426293f38d8138CA8",
       "0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96",
       "Zoo pHONEY-USDC-LP",
-      "pHONEY-USDC-LP"
+      "pHONEY-USDC"
     ]
   }
 }
