@@ -2,7 +2,7 @@ import _ from 'lodash';
 import { ethers } from 'hardhat';
 import { expect } from 'chai';
 import { loadFixture } from '@nomicfoundation/hardhat-network-helpers';
-import { deployContractsFixture } from './utils';
+import { deployContractsFixture, expectBigNumberEquals } from './utils';
 import { 
   MockVault, RedeemPool, PToken,
   MockVault__factory, RedeemPool__factory, PToken__factory,
@@ -120,9 +120,9 @@ describe('RedeemPool', () => {
     await expect(iBGT.connect(Alice).approve(await mockVault.getAddress(), rebaseAmount)).not.to.be.reverted;
     await expect(mockVault.connect(Alice).mockSwap(rebaseAmount)).not.to.be.reverted;
 
-    expect(await redeemPool.userRedeemingBalance(Alice.address)).to.equal(ethers.parseUnits("0.0011", await piBGT.decimals()));
-    expect(await redeemPool.userRedeemingBalance(Bob.address)).to.equal(ethers.parseUnits("0.0022", await piBGT.decimals()));
-    expect(await redeemPool.totalRedeemingBalance()).to.equal(ethers.parseUnits("0.0033", await piBGT.decimals()));
+    expectBigNumberEquals(ethers.parseUnits("0.0011", await piBGT.decimals()), await redeemPool.userRedeemingBalance(Alice.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0022", await piBGT.decimals()), await redeemPool.userRedeemingBalance(Bob.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0033", await piBGT.decimals()), await redeemPool.totalRedeemingBalance());
 
     // Update redeems
     await expect(piBGT.connect(Alice).transfer(Caro.address, ethers.parseUnits("100000", await piBGT.decimals()))).not.to.be.reverted;
@@ -130,10 +130,11 @@ describe('RedeemPool', () => {
     await expect(await redeemPool.connect(Alice).redeem(ethers.parseUnits("0.0011", await piBGT.decimals()))).not.to.be.reverted;
     await expect(await redeemPool.connect(Bob).redeem(ethers.parseUnits("0.0011", await piBGT.decimals()))).not.to.be.reverted;
     await expect(await redeemPool.connect(Caro).redeem(ethers.parseUnits("0.0011", await piBGT.decimals()))).not.to.be.reverted;
-    expect(await redeemPool.userRedeemingBalance(Alice.address)).to.equal(ethers.parseUnits("0.0022", await piBGT.decimals()));
-    expect(await redeemPool.userRedeemingBalance(Bob.address)).to.equal(ethers.parseUnits("0.0033", await piBGT.decimals()));
-    expect(await redeemPool.userRedeemingBalance(Caro.address)).to.equal(ethers.parseUnits("0.0011", await piBGT.decimals()));
-    expect(await redeemPool.totalRedeemingBalance()).to.equal(ethers.parseUnits("0.0066", await piBGT.decimals()));
+
+    expectBigNumberEquals(ethers.parseUnits("0.0022", await piBGT.decimals()), await redeemPool.userRedeemingBalance(Alice.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0033", await piBGT.decimals()), await redeemPool.userRedeemingBalance(Bob.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0011", await piBGT.decimals()), await redeemPool.userRedeemingBalance(Caro.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0066", await piBGT.decimals()), await redeemPool.totalRedeemingBalance());
 
     // Mock settlement
     const totalRedeemAmount = await redeemPool.totalRedeemingBalance();
@@ -165,25 +166,28 @@ describe('RedeemPool', () => {
     await expect(mockVault.connect(Alice).mockEndEpoch(await redeemPool.getAddress())).to.be.revertedWith('Already settled');
 
     // Check earned asset amount
-    expect(await redeemPool.earnedAssetAmount(Alice.address)).to.equal(ethers.parseUnits("0.0022", await iBGT.decimals()));
-    expect(await redeemPool.earnedAssetAmount(Bob.address)).to.equal(ethers.parseUnits("0.0033", await iBGT.decimals()));
-    expect(await redeemPool.earnedAssetAmount(Caro.address)).to.equal(ethers.parseUnits("0.0011", await iBGT.decimals()));
+    expectBigNumberEquals(ethers.parseUnits("0.0022", await iBGT.decimals()), await redeemPool.earnedAssetAmount(Alice.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0033", await iBGT.decimals()), await redeemPool.earnedAssetAmount(Bob.address));
+    expectBigNumberEquals(ethers.parseUnits("0.0011", await iBGT.decimals()), await redeemPool.earnedAssetAmount(Caro.address));
+    let actualAliceEarned = await redeemPool.earnedAssetAmount(Alice.address);
+
     trans = await redeemPool.connect(Alice).claimAssetToken();
     await expect(trans).to.changeTokenBalances(
       iBGT,
       [Alice.address, await redeemPool.getAddress()],
-      [ethers.parseUnits("0.0022", await iBGT.decimals()), -ethers.parseUnits("0.0022", await iBGT.decimals())]
+      [actualAliceEarned, -actualAliceEarned]
     );
-    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Alice.address, ethers.parseUnits("0.0022", await iBGT.decimals()), ethers.parseUnits("0.0022", await iBGT.decimals()), 0);
+    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Alice.address, actualAliceEarned, actualAliceEarned, 0);
 
     // Bob exit
+    let actualBobEarned = await redeemPool.earnedAssetAmount(Bob.address);
     trans = await redeemPool.connect(Bob).exit();
     await expect(trans).to.changeTokenBalances(
       iBGT,
       [Bob.address, await redeemPool.getAddress()],
-      [ethers.parseUnits("0.0033", await iBGT.decimals()), -ethers.parseUnits("0.0033", await iBGT.decimals())]
+      [actualBobEarned, -actualBobEarned]
     );
-    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Bob.address, ethers.parseUnits("0.0033", await iBGT.decimals()), ethers.parseUnits("0.0033", await iBGT.decimals()), 0);
+    await expect(trans).to.emit(redeemPool, "AssetTokenClaimed").withArgs(Bob.address, actualBobEarned, actualBobEarned, 0);
 
   });
 
@@ -215,6 +219,107 @@ describe('RedeemPool', () => {
 
     // Cannot settle again
     await expect(mockVault.connect(Alice).mockEndEpoch(await redeemPool.getAddress())).to.be.revertedWith('Already settled');
+  });
+
+  it('Vulnerable RedeemPool', async () => {
+    const [Alice, Bob, Caro] = await ethers.getSigners();
+    
+    // Deploy vulnerable RedeemPool for testing
+    const RedeemPoolFactory = await ethers.getContractFactory("MockRedeemPool");
+    const RedeemPool = await RedeemPoolFactory.deploy(await mockVault.getAddress());
+    let vulnerableRedeemPool = RedeemPool__factory.connect(await RedeemPool.getAddress(), ethers.provider);
+
+    await expect(piBGT.connect(Alice).approve(await vulnerableRedeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+    await expect(piBGT.connect(Bob).approve(await vulnerableRedeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+    await expect(piBGT.connect(Caro).approve(await vulnerableRedeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+
+    // Step 1: Alice deposit 0.00(17)1 $piBGT, and got 1 shares
+    await expect(vulnerableRedeemPool.connect(Alice).redeem(1n)).not.to.be.reverted;
+    expect(await vulnerableRedeemPool.userRedeemingShares(Alice.address)).to.equal(1);
+    expect(await vulnerableRedeemPool.totalRedeemingShares()).to.equal(1);
+    expect(await vulnerableRedeemPool.userRedeemingBalance(Alice.address)).to.equal(1);
+    expect(await vulnerableRedeemPool.totalRedeemingBalance()).to.equal(1);
+
+    // Step 2: Alice directly transfer 10 $piBGT to the RedeemPool
+    let aliceDonateAmount = ethers.parseUnits("10", await piBGT.decimals());
+    await expect(piBGT.connect(Alice).transfer(await vulnerableRedeemPool.getAddress(), aliceDonateAmount)).not.to.be.reverted;
+
+    // Step 3: Bob deposit 1 $piBGT, and got 0 shares
+    let bobDepositAmount = ethers.parseUnits("1", await piBGT.decimals());
+    await expect(vulnerableRedeemPool.connect(Bob).redeem(bobDepositAmount)).not.to.be.reverted;
+    expect(await vulnerableRedeemPool.userRedeemingShares(Alice.address)).to.equal(1);
+    expect(await vulnerableRedeemPool.userRedeemingShares(Bob.address)).to.equal(0);
+    expect(await vulnerableRedeemPool.totalRedeemingShares()).to.equal(1);
+
+    // Caro deposit 10 $piBGT, and got 0 shares
+    let caroDepositAmount = ethers.parseUnits("10", await piBGT.decimals());
+    await expect(piBGT.connect(Bob).transfer(Caro.address, caroDepositAmount)).not.to.be.reverted;
+    await expect(vulnerableRedeemPool.connect(Caro).redeem(caroDepositAmount)).not.to.be.reverted;
+    expect(await vulnerableRedeemPool.userRedeemingShares(Alice.address)).to.equal(1);
+    expect(await vulnerableRedeemPool.userRedeemingShares(Bob.address)).to.equal(0);
+    expect(await vulnerableRedeemPool.userRedeemingShares(Caro.address)).to.equal(0);
+    expect(await vulnerableRedeemPool.totalRedeemingShares()).to.equal(1);
+
+    // Alice got all the deposits
+    expect(await vulnerableRedeemPool.userRedeemingBalance(Alice.address)).to.equal(1n + aliceDonateAmount + bobDepositAmount + caroDepositAmount);
+    expect(await vulnerableRedeemPool.userRedeemingBalance(Bob.address)).to.equal(0);
+    expect(await vulnerableRedeemPool.userRedeemingBalance(Caro.address)).to.equal(0);
+
+  });
+
+  it('RedeemPool is donation attach proof', async () => {
+    const [Alice, Bob, Caro] = await ethers.getSigners();
+    const iBGT = MockERC20__factory.connect(await mockVault.assetToken(), ethers.provider);
+
+    const decimalsOffset = await redeemPool.decimalsOffset(); // 8
+
+    await expect(piBGT.connect(Alice).approve(await redeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+    await expect(piBGT.connect(Bob).approve(await redeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+    await expect(piBGT.connect(Caro).approve(await redeemPool.getAddress(), ethers.parseUnits("1000000", await piBGT.decimals()))).not.to.be.reverted;
+
+    // Step 1: Alice deposit 0.00(17)1 $piBGT, and got 10^8 shares
+    await expect(redeemPool.connect(Alice).redeem(1n)).not.to.be.reverted;
+    let aliceExpectedShares = 10n ** decimalsOffset;
+    expect(await redeemPool.userRedeemingShares(Alice.address)).to.equal(aliceExpectedShares);
+    expect(await redeemPool.totalRedeemingShares()).to.equal(aliceExpectedShares);
+    expect(await redeemPool.userRedeemingBalance(Alice.address)).to.equal(1);
+    expect(await redeemPool.totalRedeemingBalance()).to.equal(1);
+
+    // Step 2: Alice directly transfer 10 $piBGT to the RedeemPool
+    let aliceDonateAmount = ethers.parseUnits("10", await piBGT.decimals());
+    await expect(piBGT.connect(Alice).transfer(await redeemPool.getAddress(), aliceDonateAmount)).not.to.be.reverted;
+
+    // Step 3: Bob deposit 1 $piBGT, and got 2 * 10^7 shares
+    let bobDepositAmount = ethers.parseUnits("1", await piBGT.decimals());
+    let bobExpectedShares = 2n * 10n ** (decimalsOffset - 1n);
+    await expect(redeemPool.connect(Bob).redeem(bobDepositAmount)).not.to.be.reverted;
+    let bobActualShares = await redeemPool.userRedeemingShares(Bob.address);
+
+    expect(await redeemPool.userRedeemingShares(Alice.address)).to.equal(10n ** decimalsOffset);
+    expectBigNumberEquals(bobExpectedShares, bobActualShares);
+    expectBigNumberEquals(aliceExpectedShares + bobExpectedShares, await redeemPool.totalRedeemingShares());
+
+    // Caro deposit 10 $piBGT, and got 2 * 10^8 shares
+    let caroDepositAmount = ethers.parseUnits("10", await piBGT.decimals());
+    let caroExpectedShares = 2n * 10n ** decimalsOffset;
+    await expect(piBGT.connect(Bob).transfer(Caro.address, caroDepositAmount)).not.to.be.reverted;
+    await expect(redeemPool.connect(Caro).redeem(caroDepositAmount)).not.to.be.reverted;
+    let caroActualShares = await redeemPool.userRedeemingShares(Caro.address);
+
+    expectBigNumberEquals(caroExpectedShares, caroActualShares);
+    expectBigNumberEquals(aliceExpectedShares + bobExpectedShares + caroExpectedShares, await redeemPool.totalRedeemingShares());
+
+    // Check balances
+    let aliceRedeemingBalances = await redeemPool.userRedeemingBalance(Alice.address);
+    let bobRedeemingBalances = await redeemPool.userRedeemingBalance(Bob.address);
+    let caroRedeemingBalances = await redeemPool.userRedeemingBalance(Caro.address);
+    console.log(`Alice redeeming balance: ${ethers.formatUnits(aliceRedeemingBalances.toString(), await piBGT.decimals())}`);
+    console.log(`Bob redeeming balance: ${ethers.formatUnits(bobRedeemingBalances.toString(), await piBGT.decimals())}`);
+    console.log(`Caro redeeming balance: ${ethers.formatUnits(caroRedeemingBalances.toString(), await piBGT.decimals())}`);
+
+    // Bob and Caros should not lose their deposits (but Alice donates some assets to the vault)
+    expectBigNumberEquals(bobDepositAmount, bobRedeemingBalances);
+    expectBigNumberEquals(caroDepositAmount, caroRedeemingBalances);
   });
 
 });

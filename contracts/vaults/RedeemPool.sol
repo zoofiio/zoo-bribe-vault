@@ -16,6 +16,7 @@ import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 
 contract RedeemPool is Context, ReentrancyGuard {
+  using Math for uint256;
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
@@ -63,6 +64,14 @@ contract RedeemPool is Context, ReentrancyGuard {
     return _settled;
   }
 
+  function totalRedeemingShares() external view returns (uint256) {
+    return _totalRedeemingShares;
+  }
+
+  function userRedeemingShares(address account) external view returns (uint256) {
+    return _userRedeemingShares[account];
+  }
+
   // $piBGT
   function totalRedeemingBalance() public view onlyBeforeSettlement returns (uint256) {
     return IERC20(_redeemingPToken).balanceOf(address(this));
@@ -78,20 +87,18 @@ contract RedeemPool is Context, ReentrancyGuard {
     return _userRedeemingShares[account].mul(_assetAmountPerRedeemingShare.sub(_userAssetAmountPerRedeemingSharePaid[account])).div(1e18).add(_userAssetAmounts[account]);
   }
 
-  function getRedeemingSharesByBalance(uint256 stakingBalance) public view onlyBeforeSettlement returns (uint256) {
-    if (totalRedeemingBalance() == 0 || _totalRedeemingShares == 0) return stakingBalance;
-
-    return stakingBalance
-      .mul(_totalRedeemingShares)
-      .div(totalRedeemingBalance());
+  function getRedeemingSharesByBalance(uint256 stakingBalance) public virtual view onlyBeforeSettlement returns (uint256) {
+    return _convertToShares(stakingBalance);
   }
 
-  function getRedeemingBalanceByShares(uint256 stakingShares) public view onlyBeforeSettlement returns (uint256) {
-    if (_totalRedeemingShares == 0) return 0;
-  
-    return stakingShares
-      .mul(totalRedeemingBalance())
-      .div(_totalRedeemingShares);
+  function getRedeemingBalanceByShares(uint256 stakingShares) public virtual view onlyBeforeSettlement returns (uint256) {
+    return _convertToAssets(stakingShares);
+  }
+
+  // https://docs.openzeppelin.com/contracts/5.x/erc4626
+  // https://github.com/boringcrypto/YieldBox/blob/master/contracts/YieldBoxRebase.sol
+  function decimalsOffset() public view virtual returns (uint8) {
+    return 8;
   }
 
   /* ========== MUTATIVE FUNCTIONS ========== */
@@ -171,6 +178,22 @@ contract RedeemPool is Context, ReentrancyGuard {
       
       emit AssetTokenClaimed(account, amount, netAmount, fees);
     }
+  }
+
+  function _convertToShares(uint256 assets) internal view virtual returns (uint256) {
+    return assets.mulDiv(
+      _totalRedeemingShares + 10 ** decimalsOffset(), 
+      totalRedeemingBalance() + 1, 
+      Math.Rounding.Down
+    );
+  }
+
+  function _convertToAssets(uint256 shares) internal view virtual returns (uint256) {
+    return shares.mulDiv(
+      totalRedeemingBalance() + 1,
+      _totalRedeemingShares + 10 ** decimalsOffset(),
+      Math.Rounding.Down
+    );
   }
 
   /* ========== MODIFIERS ========== */
