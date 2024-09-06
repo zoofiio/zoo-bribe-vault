@@ -126,9 +126,9 @@ library VaultCalculator {
   }
 
   function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  
-    Constants.Epoch memory epoch = self.epochInfoById(epochId);
-    uint256 epochEndTime = epoch.startTime.add(epoch.duration);
-    require(block.timestamp > epochEndTime, "Epoch not ended yet");
+    // Constants.Epoch memory epoch = self.epochInfoById(epochId);
+    // uint256 epochEndTime = epoch.startTime.add(epoch.duration);
+    // require(block.timestamp > epochEndTime, "Epoch not ended yet");
 
     uint256 yTokenBalanceSynthetic = self.yTokenUserBalanceSynthetic(epochId, account);
     uint256 yTokenTotalSyntheticOfVault = self.yTokenUserBalanceSynthetic(epochId, address(self));

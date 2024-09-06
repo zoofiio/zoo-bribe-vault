@@ -69,7 +69,7 @@ async function main() {
 
   const honeyUsdcLPVaultAddress = await deployContract("Vault", [
     protocolAddress, protocolSettingsAddress, honeyUsdcStakingPoolAddress,
-    honeyUsdcLPAddress, "Zoo pHONEY-USDC-LP", "pHONEY-USDC-LP"
+    honeyUsdcLPAddress, "Zoo pHONEY-USDC-LP", "pHONEY-USDC"
   ], "HONEY-USDC-LP_Vault", {
     libraries: {
       VaultCalculator: vaultCalculatorAddress,
