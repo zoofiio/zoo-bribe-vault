@@ -12,6 +12,7 @@ import "../interfaces/IVault.sol";
 
 library VaultCalculator {
   using EnumerableSet for EnumerableSet.AddressSet;
+  using Math for uint256;
   using SafeMath for uint256;
 
   uint256 public constant SCALE = 10 ** 18;
@@ -51,12 +52,15 @@ library VaultCalculator {
     uint256 APRi = self.paramValue("APRi");
 
     uint256 X = S;
+    console.log("calcInitSwapParams, X: %s", X);
 
     // Y0 = X * APRi * D / 86400 / 365
     uint256 Y0 = X.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
+    console.log("calcInitSwapParams, Y0: %s", Y0);
 
     // k0 = X * Y0
     uint256 k0 = X.mul(Y0);   // scale: 10 ** 10
+    console.log("calcInitSwapParams, k0: %s", k0);
 
     return (X, k0);
   }
@@ -107,15 +111,15 @@ library VaultCalculator {
     // console.log("doCalSwap, X.mul(n).mul(T.T1).mul(T.T1): %s", X.mul(n).mul(T.T1).mul(T.T1));
 
     // X * n * (1 + ∆t / 86400)2
-    T.T2 = X.mul(n).mul(T.T1).div(SCALE).mul(T.T1);   // scale: 18
+    T.T2 = X.mul(n).mulDiv(T.T1, SCALE).mul(T.T1);   // scale: 18
     console.log("doCalcSwap, T2: %s", T.T2);
 
     // k0 + X * n * (1 + ∆t / 86400)2
-    T.T3 = k0.mul(SCALE).div(10 ** Constants.PROTOCOL_DECIMALS).add(T.T2).div(SCALE);   // scale: 1
+    T.T3 = k0.mulDiv(SCALE, 10 ** Constants.PROTOCOL_DECIMALS).add(T.T2).div(SCALE);  
     console.log("doCalcSwap, T.T3: %s", T.T3);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
-    uint256 X_updated = X.mul(k0).div(10 ** Constants.PROTOCOL_DECIMALS).div(T.T3);
+    uint256 X_updated = X.mulDiv(k0, 10 ** Constants.PROTOCOL_DECIMALS).div(T.T3);
     console.log("doCalcSwap, X_updated: %s", X_updated);
 
     // m = X - X'
