@@ -167,7 +167,7 @@ export async function expectedY(vault: Vault) {
   // Y = k0 / (X * (1 + ∆t / 86400)2)
   let decayPeriod = Number(await vault.paramValue(encodeBytes32String("D"))) / 30;
   let X = Number(await vault.epochNextSwapX(epochId));
-  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** 10);
+  let k0 = Number(await vault.epochNextSwapK0(epochId));
   let Y = k0 / (X * (1 + deltaT / decayPeriod) * (1 + deltaT / decayPeriod));
 
   return Y;

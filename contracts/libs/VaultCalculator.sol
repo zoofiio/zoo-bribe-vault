@@ -34,7 +34,7 @@ library VaultCalculator {
     // Y = k0 / (X * (1 + ∆t / 86400)2) = k0 / X / (1 + ∆t / 86400) / (1 + ∆t / 86400)
     uint256 X = self.epochNextSwapX(epochId);
     require(X > 0, "Invalid X");
-    uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 10 ** 10
+    uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 1
 
     uint256 scale = 10 ** Constants.PROTOCOL_DECIMALS;
     uint256 decayPeriod = self.paramValue("D").div(30);
@@ -42,7 +42,7 @@ library VaultCalculator {
       scale + deltaT.mul(scale).div(decayPeriod)
     ).mul(scale).div(
       scale + deltaT.mul(scale).div(decayPeriod)
-    ).div(10 ** Constants.PROTOCOL_DECIMALS);
+    );
 
     return Y;
   }
