@@ -59,7 +59,7 @@ library VaultCalculator {
     console.log("calcInitSwapParams, Y0: %s", Y0);
 
     // k0 = X * Y0
-    uint256 k0 = X.mul(Y0);   // scale: 10 ** 10
+    uint256 k0 = X.mulDiv(Y0, 10 ** Constants.PROTOCOL_DECIMALS);   // scale: 1
     console.log("calcInitSwapParams, k0: %s", k0);
 
     return (X, k0);
@@ -75,8 +75,8 @@ library VaultCalculator {
     console.log("updateSwapParamsOnDeposit, X: %s, k0: %s, X_updated: %s", X, k0, X_updated);
 
     // k'0 = ((X + m) / X)^2 * k0 = (X + m) * (X + m) * k0 / X / X = X' * X' * k0 / X / X
-    uint256 k0_updated = X_updated.mul(X_updated).div(X).mul(k0).div(X);  // scale: 10 ** 10
-    console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated);
+    uint256 k0_updated = X_updated.mulDiv(X_updated, X).mulDiv(k0, X);  // scale: 1
+    console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated); 
 
     return (X_updated, k0_updated);
   }
@@ -84,7 +84,7 @@ library VaultCalculator {
   function doCalcSwap(IVault self, uint256 n) public view returns (uint256, uint256) {
     uint256 epochId = self.currentEpochId();
     uint256 X = self.epochNextSwapX(epochId);
-    uint256 k0 = self.epochNextSwapK0(epochId); // scale: 10 ** 10
+    uint256 k0 = self.epochNextSwapK0(epochId); // scale: 1
 
     uint256 deltaT = 0;
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
@@ -105,21 +105,21 @@ library VaultCalculator {
     T.T1 = SCALE.add(
       deltaT.mul(SCALE).div(decayPeriod)
     );  // scale: 18
-    console.log("doCalcSwap, T1: %s", T.T1);
+    console.log("doCalcSwap, n:%s, T1: %s", n, T.T1);
 
     // console.log("doCalSwap, X.mul(n).mul(T.T1): %s", X.mul(n).mul(T.T1));
     // console.log("doCalSwap, X.mul(n).mul(T.T1).mul(T.T1): %s", X.mul(n).mul(T.T1).mul(T.T1));
 
     // X * n * (1 + ∆t / 86400)2
-    T.T2 = X.mul(n).mulDiv(T.T1, SCALE).mul(T.T1);   // scale: 18
+    T.T2 = X.mulDiv(n.mulDiv(T.T1 * T.T1, SCALE), SCALE);   // scale: 1
     console.log("doCalcSwap, T2: %s", T.T2);
 
     // k0 + X * n * (1 + ∆t / 86400)2
-    T.T3 = k0.mulDiv(SCALE, 10 ** Constants.PROTOCOL_DECIMALS).add(T.T2).div(SCALE);  
+    T.T3 = k0.add(T.T2);
     console.log("doCalcSwap, T.T3: %s", T.T3);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
-    uint256 X_updated = X.mulDiv(k0, 10 ** Constants.PROTOCOL_DECIMALS).div(T.T3);
+    uint256 X_updated = X.mulDiv(k0, T.T3);
     console.log("doCalcSwap, X_updated: %s", X_updated);
 
     // m = X - X'

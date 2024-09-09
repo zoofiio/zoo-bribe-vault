@@ -81,6 +81,15 @@ export function expandTo18Decimals(n: number) {
 }
 
 // ensure result is within .01%
+export function expectNumberEquals(expected: number, actual: number) {
+  const equals = absNum(expected - actual) <= absNum(expected) / 10000;
+  if (!equals) {
+    console.log(`Number does not equal. expected: ${expected.toString()}, actual: ${actual.toString()}`);
+  }
+  expect(equals).to.be.true;
+}
+
+// ensure result is within .01%
 export function expectBigNumberEquals(expected: bigint, actual: bigint) {
   const equals = abs(expected - actual) <= abs(expected) / 10000n;
   if (!equals) {
@@ -103,6 +112,10 @@ export function power(pow: number | bigint) {
 
 export function abs(n: bigint) {
   return n < 0n ? -n : n;
+}
+
+export function absNum(n: number) {
+  return n < 0 ? -n : n;
 }
 
 export const addr0000 = "0x0000000000000000000000000000000000000000";
@@ -195,7 +208,7 @@ export async function expectedCalcSwap(vault: Vault, n: number) {
   const epochId = await vault.currentEpochId();  // require epochId > 0
 
   let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** 18);
-  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18 + 10));
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18));
 
   const epoch = await vault.epochInfoById(epochId);
   let deltaT = 0;
