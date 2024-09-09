@@ -218,6 +218,11 @@ describe('Bribe Vault', () => {
     expectBigNumberEquals(parseUnits(result.X + "", 18), actualX);
     expectBigNumberEquals(parseUnits(result.k0 + "", 18 + 18 + 10), actualK0);
 
+    // check Y
+    let actualY = await vault.Y();
+    let expectedYValue = await expectedY(vault);
+    expectBigNumberEquals(BigInt(expectedYValue), actualY);
+
     // 1 hour later, Bob swaps 10 $iBGT for yTokens
     console.log("\n========= Bob swaps 10 $iBGT for YTokens ===============");
 
@@ -244,6 +249,11 @@ describe('Bribe Vault', () => {
     // X is changed
     console.log(`X after swap: ${await vault.epochNextSwapX(epochId)}`);
 
+    // check Y
+    actualY = await vault.Y();
+    expectedYValue = await expectedY(vault);
+    expectBigNumberEquals(BigInt(expectedYValue), actualY);
+
     // 1 day later, Bob swaps another 20 $iBGT for yTokens
     console.log("\n========= Bob swaps 10 $iBGT for YTokens ===============");
     await time.increaseTo(genesisTime + 3600 * 10);
@@ -264,6 +274,11 @@ describe('Bribe Vault', () => {
 
     // X is changed
     console.log(`X after swap: ${await vault.epochNextSwapX(epochId)}`);
+
+    // check Y
+    actualY = await vault.Y();
+    expectedYValue = await expectedY(vault);
+    expectBigNumberEquals(BigInt(expectedYValue), actualY);
 
     // 10 days later, Alice deposits 100 $iBGT, k0 is updated
     console.log("\n========= Alice deposits 100 $iBGT ===============");
@@ -293,6 +308,11 @@ describe('Bribe Vault', () => {
     console.log(`k0: ${await vault.epochNextSwapK0(epochId)}`);
     console.log(`X after swap: ${await vault.epochNextSwapX(epochId)}`);
 
+    // check Y
+    actualY = await vault.Y();
+    expectedYValue = await expectedY(vault);
+    expectBigNumberEquals(BigInt(expectedYValue), actualY);
+
     // 16 days later, Alice deposits 1000 $iBGT, and starts a new epoch
     console.log("\n========= Alice deposits 1000 $iBGT to start epoch 2 ===============");
     await time.increaseTo(genesisTime + ONE_DAY_IN_SECS * 16);
@@ -307,7 +327,10 @@ describe('Bribe Vault', () => {
     yTokenBalance = await vault.yTokenUserBalance(epochId, await vault.getAddress());
     console.log(`yToken balance: ${formatUnits(yTokenBalance, await iBGT.decimals())}`);    // 
 
-
+    // check Y
+    actualY = await vault.Y();
+    expectedYValue = await expectedY(vault);
+    expectBigNumberEquals(BigInt(expectedYValue), actualY);
   });
 
   it("work Y", async () => {
