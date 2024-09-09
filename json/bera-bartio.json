@@ -26,11 +26,11 @@
     ]
   },
   "VaultCalculator": {
-    "address": "0x1fE8EefE878155B7F688c62570C78Bf0AD3B0877",
+    "address": "0x0accaC0ee3F93a1BdD9e48ecB251EEB7C7f579d7",
     "args": []
   },
   "iRED_Vault": {
-    "address": "0x266c951f80b1ef4479D9795281ed1b0ED95Eb747",
+    "address": "0xEE78E51Cd9FA2aa0cE3598664e8f73a147a0F920",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -41,7 +41,7 @@
     ]
   },
   "HONEY-USDC-LP_Vault": {
-    "address": "0x6a6B9817d221816187aD335030b0EF7c17051EfA",
+    "address": "0xD6955e16e4d146E6Ea26118EAB1D6F24A5F54cdd",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -52,7 +52,7 @@
     ]
   },
   "HONEY-WBERA-LP_1_Vault": {
-    "address": "0xF778D2B9E0238D385008e916D7245F51959Ba279",
+    "address": "0xF484F7D00DD44c1F8B047b79cF8674e78FEcaba7",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -63,7 +63,7 @@
     ]
   },
   "HONEY-WBERA-LP_2_Vault": {
-    "address": "0x2fbf17c3861079d948383175719C89143754F1e7",
+    "address": "0x26c14B25ee36bEc797124d55e3D44609495149cE",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",

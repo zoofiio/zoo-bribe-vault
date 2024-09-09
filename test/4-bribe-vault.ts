@@ -310,4 +310,14 @@ describe('Bribe Vault', () => {
 
   });
 
+  it.only("work Y", async () => {
+    const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
+    const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
+    let aliceDepositAmount = ethers.parseUnits("10000000000000000", await iBGT.decimals());
+    await expect(iBGT.connect(Alice).mint(Alice.address, aliceDepositAmount)).not.to.be.reverted;
+    await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceDepositAmount)).not.to.be.reverted;
+    await expect(vault.connect(Alice).deposit(aliceDepositAmount)).not.to.be.reverted;
+    const y = await vault.connect(Alice).Y()
+    console.info(y.toString().length, y.toString())
+  })
 });
