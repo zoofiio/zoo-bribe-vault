@@ -38,7 +38,7 @@ library VaultCalculator {
     uint256 decayPeriod = self.paramValue("D").div(30);
     uint256 Y = k0.div(X).mul(SettingsScale).div(
       SettingsScale + deltaT.mul(SettingsScale).div(decayPeriod)
-    ).mul(SCALE).div(
+    ).mul(SettingsScale).div(
       SettingsScale + deltaT.mul(SettingsScale).div(decayPeriod)
     ).div(SettingsScale);
 

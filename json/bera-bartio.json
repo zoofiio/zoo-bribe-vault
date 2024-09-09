@@ -18,30 +18,12 @@
       "iRED"
     ]
   },
-  "MockStakingPool": {
-    "address": "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6",
-    "args": [
-      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
-      "0x614352b4028f429168D153bA18DC7FEd667E1B4f"
-    ]
-  },
   "VaultCalculator": {
-    "address": "0x0accaC0ee3F93a1BdD9e48ecB251EEB7C7f579d7",
+    "address": "0x039C8ee87c002F5e076Ba03aa48128049218ce90",
     "args": []
   },
-  "iRED_Vault": {
-    "address": "0xEE78E51Cd9FA2aa0cE3598664e8f73a147a0F920",
-    "args": [
-      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
-      "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
-      "0xf6d6C5734A4e9F3783848FB8C7C0212a39DF55e6",
-      "0x614352b4028f429168D153bA18DC7FEd667E1B4f",
-      "Zoo piRED",
-      "piRED"
-    ]
-  },
   "HONEY-USDC-LP_Vault": {
-    "address": "0xD6955e16e4d146E6Ea26118EAB1D6F24A5F54cdd",
+    "address": "0x541B56C8B782E646b3906a22caB11ED34aC60Ad2",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -52,7 +34,7 @@
     ]
   },
   "HONEY-WBERA-LP_1_Vault": {
-    "address": "0xF484F7D00DD44c1F8B047b79cF8674e78FEcaba7",
+    "address": "0x06A21ef4639F313E8ec2D25Ae3A7EFc3621BF407",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -63,7 +45,7 @@
     ]
   },
   "HONEY-WBERA-LP_2_Vault": {
-    "address": "0x26c14B25ee36bEc797124d55e3D44609495149cE",
+    "address": "0xBE2cD9048732b94B73A10eaCb79af82C0eD196aF",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",

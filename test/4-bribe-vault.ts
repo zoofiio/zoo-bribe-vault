@@ -310,7 +310,7 @@ describe('Bribe Vault', () => {
 
   });
 
-  it.only("work Y", async () => {
+  it("work Y", async () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
     let aliceDepositAmount = ethers.parseUnits("10000000000000000", await iBGT.decimals());

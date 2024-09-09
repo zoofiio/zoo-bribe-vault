@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract, wait1Tx } from "./hutils";
-import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, MockStakingPool__factory } from "../typechain";
+import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, MockStakingPool__factory, Vault__factory } from "../typechain";
 
 dotenv.config();
 
@@ -51,23 +51,23 @@ async function main() {
   }
 
   // Deploy mocked iRED staking pool
-  const stakingPoolAddress = await deployContract("MockStakingPool", [protocolAddress, iREDAddress]);
-  const stakingPool = MockStakingPool__factory.connect(stakingPoolAddress, deployer);
+  // const stakingPoolAddress = await deployContract("MockStakingPool", [protocolAddress, iREDAddress]);
+  // const stakingPool = MockStakingPool__factory.connect(stakingPoolAddress, deployer);
 
   const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
 
-  const iRedVaultAddress = await deployContract(
-    "Vault",
-    [protocolAddress, protocolSettingsAddress, stakingPoolAddress, iREDAddress, "Zoo piRED", "piRED"],
-    "iRED_Vault",
-    {
-      libraries: {
-        VaultCalculator: vaultCalculatorAddress,
-      },
-    }
-  );
-  await addVault(iRedVaultAddress)
-  console.log("Added iRED vault to protocol");
+  // const iRedVaultAddress = await deployContract(
+  //   "Vault",
+  //   [protocolAddress, protocolSettingsAddress, stakingPoolAddress, iREDAddress, "Zoo piRED", "piRED"],
+  //   "iRED_Vault",
+  //   {
+  //     libraries: {
+  //       VaultCalculator: vaultCalculatorAddress,
+  //     },
+  //   }
+  // );
+  // await addVault(iRedVaultAddress)
+  // console.log("Added iRED vault to protocol");
 
   // Deploy $HONEY-USDC-LP vault
   // https://bartio.beratrail.io/address/0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96
@@ -83,6 +83,10 @@ async function main() {
         VaultCalculator: vaultCalculatorAddress,
       },
     }
+  );
+  console.info(
+    "HONEY-USDC-LP_Vault pToken:", 
+    await Vault__factory.connect(honeyUsdcLPVaultAddress, ethers.provider).pToken()
   );
   await addVault(honeyUsdcLPVaultAddress)
   console.log("Added honeyUsdcLP vault to protocol");
@@ -101,6 +105,10 @@ async function main() {
       },
     }
   );
+  console.info(
+    "HONEY-WBERA-LP_1_Vault pToken:", 
+    await Vault__factory.connect(honeyWBeraLPVaultAddress1, ethers.provider).pToken()
+  );
   await addVault(honeyWBeraLPVaultAddress1)
   console.log("Added honeyWberaLP vault1 to protocol");
   const honeyWBeraLPVaultAddress2 = await deployContract(
@@ -112,6 +120,10 @@ async function main() {
         VaultCalculator: vaultCalculatorAddress,
       },
     }
+  );
+  console.info(
+    "HONEY-WBERA-LP_1_Vault pToken:", 
+    await Vault__factory.connect(honeyWBeraLPVaultAddress2, ethers.provider).pToken()
   );
   await addVault(honeyWBeraLPVaultAddress2)
   console.log("Added honeyWberaLP vault2 to protocol");
