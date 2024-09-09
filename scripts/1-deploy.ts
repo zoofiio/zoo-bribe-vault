@@ -2,7 +2,7 @@ import * as _ from "lodash";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
-import { deployContract } from "./hutils";
+import { deployContract, wait1Tx } from "./hutils";
 import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, MockStakingPool__factory } from "../typechain";
 
 dotenv.config();
@@ -17,6 +17,8 @@ const testers: any[] = [
   "0x1851CbB368C7c49B997064086dA94dBAD90eB9b5",
 ];
 
+
+
 async function main() {
   const signers = await ethers.getSigners();
   deployer = signers[0];
@@ -28,6 +30,13 @@ async function main() {
 
   const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
   const settings = ProtocolSettings__factory.connect(await protocolSettingsAddress, deployer);
+  // add Vault to protocol
+  async function addVault(vault: string) {
+   const isVault = await protocol.connect(deployer).isVault(vault)
+   if(!isVault){
+      await protocol.connect(deployer).addVault(vault).then(tx => tx.wait(1))
+   }
+  }
 
   // Deploy mocked iRED
   const iREDAddress = await deployContract("MockERC20", [protocolAddress, "Mocked iRED Token", "iRED"]);
@@ -57,9 +66,7 @@ async function main() {
       },
     }
   );
-
-  let trans = await protocol.connect(deployer).addVault(iRedVaultAddress);
-  await trans.wait();
+  await addVault(iRedVaultAddress)
   console.log("Added iRED vault to protocol");
 
   // Deploy $HONEY-USDC-LP vault
@@ -77,10 +84,38 @@ async function main() {
       },
     }
   );
-
-  trans = await protocol.connect(deployer).addVault(honeyUsdcLPVaultAddress);
-  await trans.wait();
+  await addVault(honeyUsdcLPVaultAddress)
   console.log("Added honeyUsdcLP vault to protocol");
+
+
+  // HONEY-WBERA
+  const honeyWberaLpAddress = '0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7'
+  const honeyWberaStakingPoolAddress = '0x5c5f9a838747fb83678ECe15D85005FD4F558237'
+  const honeyWBeraLPVaultAddress1 = await deployContract(
+    "Vault",
+    [protocolAddress, protocolSettingsAddress, honeyWberaStakingPoolAddress, honeyWberaLpAddress, "Zoo pHONEY-WBERA-LP", "pHONEY-BERA"],
+    "HONEY-WBERA-LP_1_Vault",
+    {
+      libraries: {
+        VaultCalculator: vaultCalculatorAddress,
+      },
+    }
+  );
+  await addVault(honeyWBeraLPVaultAddress1)
+  console.log("Added honeyWberaLP vault1 to protocol");
+  const honeyWBeraLPVaultAddress2 = await deployContract(
+    "Vault",
+    [protocolAddress, protocolSettingsAddress, honeyWberaStakingPoolAddress, honeyWberaLpAddress, "Zoo pHONEY-WBERA-LP", "pHONEY-BERA"],
+    "HONEY-WBERA-LP_2_Vault",
+    {
+      libraries: {
+        VaultCalculator: vaultCalculatorAddress,
+      },
+    }
+  );
+  await addVault(honeyWBeraLPVaultAddress2)
+  console.log("Added honeyWberaLP vault2 to protocol");
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere

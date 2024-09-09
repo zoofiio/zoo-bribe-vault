@@ -50,5 +50,27 @@
       "Zoo pHONEY-USDC-LP",
       "pHONEY-USDC"
     ]
+  },
+  "HONEY-WBERA-LP_1_Vault": {
+    "address": "0xF778D2B9E0238D385008e916D7245F51959Ba279",
+    "args": [
+      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
+      "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
+      "0x5c5f9a838747fb83678ECe15D85005FD4F558237",
+      "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7",
+      "Zoo pHONEY-WBERA-LP",
+      "pHONEY-BERA"
+    ]
+  },
+  "HONEY-WBERA-LP_2_Vault": {
+    "address": "0x2fbf17c3861079d948383175719C89143754F1e7",
+    "args": [
+      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
+      "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
+      "0x5c5f9a838747fb83678ECe15D85005FD4F558237",
+      "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7",
+      "Zoo pHONEY-WBERA-LP",
+      "pHONEY-BERA"
+    ]
   }
 }
