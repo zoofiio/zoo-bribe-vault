@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../interfaces/IProtocolSettings.sol";
@@ -11,6 +12,7 @@ import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
 
 contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
+  using Math for uint256;
   using SafeMath for uint256;
 
   uint256 constant internal INFINITE_ALLOWANCE = type(uint256).max;
@@ -81,17 +83,13 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     // Initial mint
     if (_totalSupply == 0 || _totalShares == 0) return balance;
 
-    return balance
-      .mul(_totalShares)
-      .div(_totalSupply);
+    return balance.mulDiv(_totalShares, _totalSupply);
   }
 
   function getBalanceByShares(uint256 sharesAmount) public view override returns (uint256) {
     if (_totalShares == 0) return 0;
   
-    return sharesAmount
-      .mul(_totalSupply)
-      .div(_totalShares);
+    return sharesAmount.mulDiv(_totalSupply, _totalShares);
   }
 
   /* ================= IERC20 Functions ================ */

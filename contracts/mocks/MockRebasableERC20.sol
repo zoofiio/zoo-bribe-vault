@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "./MockERC20.sol";
 
 contract MockRebasableERC20 is MockERC20 {
+  using Math for uint256;
   using SafeMath for uint256;
 
   constructor(
@@ -48,9 +50,7 @@ contract MockRebasableERC20 is MockERC20 {
     if (_totalSupply == 0) {
       return 0;
     } else {
-      return amount
-        .mul(_totalShares)
-        .div(_totalSupply);
+      return amount.mulDiv(_totalShares, _totalSupply);
     }
   }
 
@@ -58,9 +58,7 @@ contract MockRebasableERC20 is MockERC20 {
     if (_totalShares == 0) {
       return 0;
     } else {
-      return _sharesAmount
-        .mul(_totalSupply)
-        .div(_totalShares);
+      return _sharesAmount.mulDiv(_totalSupply, _totalShares);
     }
   }
 
