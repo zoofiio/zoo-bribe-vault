@@ -169,13 +169,14 @@ describe('Bribe Vault', () => {
     const vaultYTokenBalanceSynthetic = await vault.yTokenUserBalanceSynthetic(currentEpochId, await vault.getAddress());
     const totalYTokenBalanceSynthetic = await vault.yTokenTotalSupplySynthetic(currentEpochId);
     console.log(aliceYTokenBalanceSynthetic, bobYTokenBalanceSynthetic, totalYTokenBalanceSynthetic);
-    expectBigNumberEquals(aliceYTokenBalanceSynthetic + bobYTokenBalanceSynthetic + vaultYTokenBalanceSynthetic, totalYTokenBalanceSynthetic);
+    expect(vaultYTokenBalanceSynthetic).to.equal(0);
+    expectBigNumberEquals(aliceYTokenBalanceSynthetic + bobYTokenBalanceSynthetic, totalYTokenBalanceSynthetic);
 
-    const expectedAliceBribesIBGT = vaultBribesIBGTAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
-    const expectedBobBribesIBGT = vaultBribesIBGTAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
+    const expectedAliceBribesIBGT = vaultBribesIBGTAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic);
+    const expectedBobBribesIBGT = vaultBribesIBGTAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic);
 
-    const expectedAliceBribesBRB = vaultBribesBRBAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
-    const expectedBobBribesBRB = vaultBribesBRBAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic - vaultYTokenBalanceSynthetic);
+    const expectedAliceBribesBRB = vaultBribesBRBAmount * aliceYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic);
+    const expectedBobBribesBRB = vaultBribesBRBAmount * bobYTokenBalanceSynthetic / (totalYTokenBalanceSynthetic);
 
     const actualAliceBribes = await vault.calcBribes(currentEpochId, Alice.address);
     const actualBobBribes = await vault.calcBribes(currentEpochId, Bob.address);

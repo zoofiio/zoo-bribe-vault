@@ -44,15 +44,15 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
-  mapping(uint256 => uint256) _assetTotalSwapAmount;
+  mapping(uint256 => uint256) internal _assetTotalSwapAmount;
 
-  mapping(uint256 => uint256) _yTokenTotalSupply;
-  mapping(uint256 => mapping(address => uint256)) _yTokenUserBalances;
-  mapping(uint256 => uint256) _yTokenTotalSupplySynthetic;
-  mapping(uint256 => mapping(address => uint256)) _yTokenUserBalancesSynthetic;
+  mapping(uint256 => uint256) internal _yTokenTotalSupply;  // including yTokens hold by Vault
+  mapping(uint256 => mapping(address => uint256)) internal _yTokenUserBalances;
+  mapping(uint256 => uint256) internal _yTokenTotalSupplySynthetic;  // NOT including yTokens hold by Vault
+  mapping(uint256 => mapping(address => uint256)) internal _yTokenUserBalancesSynthetic;
 
-  mapping(uint256 => uint256) _epochNextSwapX;
-  mapping(uint256 => uint256) _epochNextSwapK0;  // scale: 10 ** 10
+  mapping(uint256 => uint256) internal _epochNextSwapX;
+  mapping(uint256 => uint256) internal _epochNextSwapK0;
 
   mapping(uint256 => EnumerableSet.AddressSet) internal _bribeTokens;  // epoch id => bribe tokens set
   mapping(uint256 => mapping(address => uint256)) internal _bribeTotalAmount;  // epoch id => (bribe token => total amount)
@@ -216,9 +216,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)].add(yTokenAmount);
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
 
-    uint256 yTokenAmountSynthetic = yTokenAmount.mul(currentEpochEndTime.sub(block.timestamp));
-    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
-    _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].add(yTokenAmountSynthetic);
+    // uint256 yTokenAmountSynthetic = yTokenAmount.mul(currentEpochEndTime.sub(block.timestamp));
+    // _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
+    // _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].add(yTokenAmountSynthetic);
 
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
   }
@@ -233,8 +233,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
       TokensTransfer.transferTokens(address(_assetToken), address(this), IProtocolSettings(settings).treasury(), fees);
     }
     uint256 netAmount = amount.sub(fees);
+    stakingPool.stake(netAmount);
+
     uint256 pTokenAmount = netAmount;
-    stakingPool.stake(pTokenAmount);
     IPToken(_pToken).rebase(pTokenAmount);
 
     _assetTotalSwapAmount[_currentEpochId.current()] = _assetTotalSwapAmount[_currentEpochId.current()].add(netAmount);
@@ -249,8 +250,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
 
     Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
     uint256 yTokenAmountSynthetic = yTokenAmount.mul(epoch.startTime.add(epoch.duration).sub(block.timestamp));
-    _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].sub(yTokenAmountSynthetic);
+    // _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][address(this)].sub(yTokenAmountSynthetic);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()].add(yTokenAmountSynthetic);
+    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()].add(yTokenAmountSynthetic);
 
     emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
   }
@@ -379,9 +381,9 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
       _yTokenTotalSupply[epochId] = yTokenAmount;
       _yTokenUserBalances[epochId][address(this)] = yTokenAmount;
       
-      uint256 yTokenAmountSynthetic = yTokenAmount.mul(_epochs[epochId].duration);
-      _yTokenTotalSupplySynthetic[epochId] = yTokenAmountSynthetic;
-      _yTokenUserBalancesSynthetic[epochId][address(this)] = yTokenAmountSynthetic;
+      // uint256 yTokenAmountSynthetic = yTokenAmount.mul(_epochs[epochId].duration);
+      // _yTokenTotalSupplySynthetic[epochId] = yTokenAmountSynthetic;
+      // _yTokenUserBalancesSynthetic[epochId][address(this)] = yTokenAmountSynthetic;
     }
   }
 
