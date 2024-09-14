@@ -196,6 +196,7 @@ describe('Bribe Vault', () => {
     expect(actualBobBribes[1][1]).to.equal(await brbToken.getAddress());
     expectBigNumberEquals(expectedBobBribesBRB, actualBobBribes[1][2]);
 
+    console.log("\n========= Alice claimed bribes ===============");
     trans = await vault.connect(Alice).claimBribes(currentEpochId);
     await expect(trans).to.changeTokenBalances(
       iBGT,
@@ -219,6 +220,82 @@ describe('Bribe Vault', () => {
     expect(actualAliceBribes[0][2]).to.equal(0);
     expect(actualAliceBribes[1][1]).to.equal(await brbToken.getAddress());
     expect(actualAliceBribes[1][2]).to.equal(0);
+
+    // Alice add Bob as briber
+    const brbToken2 = await makeToken(await protocol.getAddress(), "Bribe Token", "BRB2");
+    await expect(brbToken2.connect(Alice).mint(Bob.address, ethers.parseUnits("1000000", await brbToken2.decimals()))).not.to.be.reverted;
+    let bribeAmountBRB2 = ethers.parseUnits("2000", await brbToken2.decimals());
+    await expect(brbToken2.connect(Bob).approve(await vault.getAddress(), bribeAmountBRB2)).not.to.be.reverted;
+    await expect(vault.connect(Bob).addBribeToken(await brbToken2.getAddress())).to.be.reverted;
+    await expect(vault.connect(Bob).addBribes(await brbToken2.getAddress(), bribeAmountBRB2)).to.be.reverted;
+
+    // Bob add new bribes
+    console.log("\n========= Bob add $BRB2 bribes ===============");
+    await expect(vault.connect(Alice).setBriber(Bob.address, true))
+      .to.emit(vault, "UpdateBriber").withArgs(Bob.address, true);
+    await expect(vault.connect(Bob).addBribeToken(await brbToken2.getAddress()))
+      .to.emit(vault, "BribeTokenAdded").withArgs(currentEpochId, await brbToken2.getAddress(), Bob.address);
+    await expect(vault.connect(Bob).addBribes(await brbToken2.getAddress(), bribeAmountBRB2))
+      .to.emit(vault, "BribesAdded").withArgs(currentEpochId, await brbToken2.getAddress(), bribeAmountBRB2, Bob.address);
+    
+    actualAliceBribes = await vault.calcBribes(currentEpochId, Alice.address);
+    actualBobBribes = await vault.calcBribes(currentEpochId, Bob.address);
+    console.log(actualAliceBribes);
+    console.log(actualBobBribes);
+
+    // Alice get no bribes
+    expect(actualAliceBribes.length).to.equal(3);
+    expect(actualAliceBribes[0][1]).to.equal(await iBGT.getAddress());
+    expect(actualAliceBribes[0][2]).to.equal(0);
+    expect(actualAliceBribes[1][1]).to.equal(await brbToken.getAddress());
+    expect(actualAliceBribes[1][2]).to.equal(0);
+    expect(actualAliceBribes[2][1]).to.equal(await brbToken2.getAddress());
+    expect(actualAliceBribes[2][2]).to.equal(0);
+
+    // Bob get all bribes for $BRB2
+    expect(actualBobBribes.length).to.equal(3);
+    expect(actualBobBribes[0][1]).to.equal(await iBGT.getAddress());
+    expectBigNumberEquals(expectedBobBribesIBGT, actualBobBribes[0][2]);
+    expect(actualBobBribes[1][1]).to.equal(await brbToken.getAddress());
+    expectBigNumberEquals(expectedBobBribesBRB, actualBobBribes[1][2]);
+    expect(actualBobBribes[2][1]).to.equal(await brbToken2.getAddress());
+    expectBigNumberEquals(bribeAmountBRB2, actualBobBribes[2][2]);
+
+    // Alice closes vault
+    console.log("\n========= Alice closes vault ===============");
+    let iBGTBalanceBeforeClose = await iBGT.balanceOf(await vault.getAddress());
+    // expect(iBGTBalanceBeforeClose).to.equal(0);
+    console.log(`$iBGT balance before close: ${formatUnits(iBGTBalanceBeforeClose, await iBGT.decimals())}`);
+    await expect(vault.connect(Alice).close())
+      .to.emit(vault, "VaultClosed").withArgs();
+    let iBGTBalanceAfterClose = await iBGT.balanceOf(await vault.getAddress());
+    console.log(`$iBGT balance after close: ${formatUnits(iBGTBalanceAfterClose, await iBGT.decimals())}`);
+
+    let alicePTokenBalance = await piBGT.balanceOf(Alice.address);
+    let bobPTokenBalance = await piBGT.balanceOf(Bob.address);
+    console.log(`Alice $piBGT balance: ${formatUnits(alicePTokenBalance, await piBGT.decimals())}`);
+    console.log(`Bob $piBGT balance: ${formatUnits(bobPTokenBalance, await piBGT.decimals())}`);
+
+    // Could not deposit or swap after vault is closed
+    await expect(vault.connect(Alice).deposit(100)).to.be.reverted;
+    await expect(vault.connect(Alice).swap(100)).to.be.reverted;
+
+    // Alice and Bob get their $iBGT back
+    console.log("\n========= Alice and Bob get their $iBGT back ===============");
+    await expect(vault.connect(Alice).redeem(alicePTokenBalance * 2n)).to.be.reverted;
+    trans = await vault.connect(Alice).redeem(alicePTokenBalance);
+    await expect(trans).to.changeTokenBalances(
+      piBGT,
+      [Alice.address],
+      [-alicePTokenBalance]
+    );
+    await expect(trans).to.changeTokenBalances(
+      iBGT,
+      [Alice.address],
+      [alicePTokenBalance]
+    );
+    await expect(trans)
+      .to.emit(vault, "Redeem").withArgs(Alice.address, alicePTokenBalance, anyValue);
   });
 
   it('Swap works', async () => {
@@ -502,14 +579,4 @@ describe('Bribe Vault', () => {
     expectBigNumberEquals(BigInt(expectedYValue), actualY);
   });
 
-  it("work Y", async () => {
-    const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await vault.pToken(), ethers.provider);
-    let aliceDepositAmount = ethers.parseUnits("10000000000000000", await iBGT.decimals());
-    await expect(iBGT.connect(Alice).mint(Alice.address, aliceDepositAmount)).not.to.be.reverted;
-    await expect(iBGT.connect(Alice).approve(await vault.getAddress(), aliceDepositAmount)).not.to.be.reverted;
-    await expect(vault.connect(Alice).deposit(aliceDepositAmount)).not.to.be.reverted;
-    const y = await vault.connect(Alice).Y()
-    console.info(y.toString().length, y.toString())
-  })
 });

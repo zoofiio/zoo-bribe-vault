@@ -138,6 +138,18 @@ describe("Ownable", () => {
       .withArgs();
     expect(await dummyVault.paused()).to.deep.equal([false, false, false], "Mint and redeem is unpaused");
 
+    // Only admin could close a Vault
+    await expect(dummyVault.connect(Bob).close()).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).close())
+      .to.emit(dummyVault, "VaultClosed")
+      .withArgs();
+    
+    // Only admin could set briber
+    await expect(dummyVault.connect(Bob).setBriber(Bob.address, true)).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).setBriber(Bob.address, true))
+      .to.emit(dummyVault, "UpdateBriber")
+      .withArgs(Bob.address, true);
+
   });
 
 });

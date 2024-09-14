@@ -293,16 +293,20 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   function close() external nonReentrant whenNotClosed onlyOwner {
     _closed = true;
 
-    // force end current epoch
-    Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-    if (block.timestamp < currentEpoch.startTime.add(currentEpoch.duration)) {
-      currentEpoch.duration = block.timestamp.sub(currentEpoch.startTime);
+    if (_currentEpochId.current() > 0) {
+      // force end current epoch
+      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      if (block.timestamp < currentEpoch.startTime.add(currentEpoch.duration)) {
+        currentEpoch.duration = block.timestamp.sub(currentEpoch.startTime);
+      }
+      _onEndEpoch(_currentEpochId.current());
+      _updateBribes();
     }
-    _onEndEpoch(_currentEpochId.current());
-    _updateBribes();
 
     // withdraw all assets from staking pool
-    stakingPool.exit();
+    if (stakingPool.balanceOf(address(this)) > 0) {
+      stakingPool.exit();
+    }
 
     emit VaultClosed();
   }
@@ -344,6 +348,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   function addBribeToken(address bribeToken) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) {
     // current epoch may be ended
     uint256 epochId = _currentEpochId.current();
+    require(epochId > 0);
     EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
     bool added = epochBribeTokens.add(bribeToken);
     if (added) {
@@ -354,6 +359,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   function addBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) noneZeroAmount(amount) {
     // current epoch may be ended
     uint256 epochId = _currentEpochId.current();
+    require(epochId > 0);
     require(_bribeTokens[epochId].contains(bribeToken));
 
     TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), amount);
