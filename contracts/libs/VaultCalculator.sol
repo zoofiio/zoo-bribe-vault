@@ -136,7 +136,6 @@ library VaultCalculator {
     // require(block.timestamp > epochEndTime, "Epoch not ended yet");
 
     uint256 yTokenBalanceSynthetic = self.yTokenUserBalanceSynthetic(epochId, account);
-    // uint256 yTokenBalanceSyntheticOfVault = self.yTokenUserBalanceSynthetic(epochId, address(self));
     uint256 yTokenTotalSupplySynthetic = self.yTokenTotalSupplySynthetic(epochId);
     require(yTokenTotalSupplySynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
 
@@ -147,7 +146,6 @@ library VaultCalculator {
       uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
       uint256 bribes = 0;
       if (totalRewards != 0 && yTokenBalanceSynthetic != 0) {
-        // require(yTokenTotalSupplySynthetic.sub(yTokenBalanceSyntheticOfVault) > 0);
         bribes = totalRewards.mulDiv(yTokenBalanceSynthetic, yTokenTotalSupplySynthetic);
       }
       bribeInfo[i].epochId = epochId;
