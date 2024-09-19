@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 // import "hardhat/console.sol";
 
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -23,16 +24,12 @@ import "../tokens/PToken.sol";
 import "./RedeemPool.sol";
 import "./BriberExtension.sol";
 
-contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
+contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtension {
   using Counters for Counters.Counter;
   using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using EnumerableSet for EnumerableSet.AddressSet;
   using SafeMath for uint256;
   using VaultCalculator for IVault;
-
-  bool internal _depositPaused;
-  bool internal _swapPaused;
-  bool internal _claimBribesPaused;
 
   bool internal _closed;
 
@@ -83,10 +80,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
   }
 
   /* ================= VIEWS ================ */
-
-  function paused() external view virtual returns (bool, bool, bool) {
-    return (_depositPaused, _swapPaused, _claimBribesPaused);
-  }
 
   function closed() external view returns (bool) {
     return _closed;
@@ -176,7 +169,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function deposit(uint256 amount) external nonReentrant whenDepositNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
+  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -222,7 +215,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
-  function swap(uint256 amount) external nonReentrant whenSwapNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
+  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
     require(IERC20(_pToken).totalSupply() > 0, "No principal tokens");
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
@@ -255,7 +248,7 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
   }
 
-  function claimBribes(uint256 epochId) external nonReentrant whenClaimBribesNotPaused validEpochId(epochId) {
+  function claimBribes(uint256 epochId) external nonReentrant whenNotPaused validEpochId(epochId) {
     Constants.Epoch memory epoch = epochInfoById(epochId);
     uint256 epochEndTime = epoch.startTime.add(epoch.duration);
     require(block.timestamp > epochEndTime, "Epoch not ended yet");
@@ -308,37 +301,27 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
       stakingPool.exit();
     }
 
-    emit VaultClosed();
+    emit Closed();
   }
 
-  function pauseDeposit() external nonReentrant onlyOwner {
-    _depositPaused = true;
-    emit DepositPaused();
+  function pause() external nonReentrant onlyOwner {
+    if (_currentEpochId.current() > 0) {
+      Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
+      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+      redeemPool.pause();
+    }
+
+    _pause();
   }
 
-  function unpauseDeposit() external nonReentrant onlyOwner {
-    _depositPaused = false;
-    emit DepositUnpaused();
-  }
+  function unpause() external nonReentrant onlyOwner {
+    if (_currentEpochId.current() > 0) {
+      Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
+      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+      redeemPool.unpause();
+    }
 
-  function pauseSwap() external nonReentrant onlyOwner {
-    _swapPaused = true;
-    emit SwapPaused();
-  }
-
-  function unpauseSwap() external nonReentrant onlyOwner {
-    _swapPaused = false;
-    emit SwapUnpaused();
-  }
-
-  function pauseClaimBribes() external nonReentrant onlyOwner {
-    _claimBribesPaused = true;
-    emit ClaimBribesPaused();
-  }
-
-  function unpauseClaimBribes() external nonReentrant onlyOwner {
-    _claimBribesPaused = false;
-    emit ClaimBribesUnpaused();
+    _unpause();
   }
 
   function setBriber(address account, bool briber) external nonReentrant onlyOwner {
@@ -455,21 +438,6 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
     _;
   }
 
-  modifier whenDepositNotPaused() {
-    require(!_depositPaused, "Deposits are paused");
-    _;
-  }
-
-  modifier whenSwapNotPaused() {
-    require(!_swapPaused, "Swaps are paused");
-    _;
-  }
-
-  modifier whenClaimBribesNotPaused() {
-    require(!_claimBribesPaused, "Claim bribes are paused");
-    _;
-  }
-
   modifier whenClosed() {
     require(_closed);
     _;
@@ -518,19 +486,13 @@ contract Vault is IVault, ReentrancyGuard, ProtocolOwner, BriberExtension {
 
   /* =============== EVENTS ============= */
 
-  event VaultClosed();
-  event DepositPaused();
-  event DepositUnpaused();
-  event SwapPaused();
-  event SwapUnpaused();
-  event ClaimBribesPaused();
-  event ClaimBribesUnpaused();
+  event Closed();
 
   event EpochStarted(uint256 epochId, uint256 startTime, uint256 duration, address redeemPool);
 
   event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-  event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
+  event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
   event YTokenDummyBurned(uint256 indexed epochId, address indexed user, uint256 yTokenAmount);
 
   event Deposit(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);

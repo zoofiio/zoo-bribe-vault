@@ -114,34 +114,21 @@ describe("Ownable", () => {
     // await expect(dummyVault.connect(Alice).updateStakingPool(Alice.address)).not.to.be.reverted;
 
     // Only admin could pause a Vault
-    await expect(dummyVault.connect(Bob).pauseDeposit()).to.be.revertedWith("Ownable: caller is not the owner");
-    await expect(dummyVault.connect(Bob).pauseSwap()).to.be.revertedWith("Ownable: caller is not the owner");
-    await expect(dummyVault.connect(Bob).pauseClaimBribes()).to.be.revertedWith("Ownable: caller is not the owner"); 
-    await expect(dummyVault.connect(Alice).pauseDeposit())
-      .to.emit(dummyVault, "DepositPaused")
-      .withArgs();
-    await expect(dummyVault.connect(Alice).pauseSwap())
-      .to.emit(dummyVault, "SwapPaused")
-      .withArgs();
-    await expect(dummyVault.connect(Alice).pauseClaimBribes())
-      .to.emit(dummyVault, "ClaimBribesPaused")
-      .withArgs();
-    expect(await dummyVault.paused()).to.deep.equal([true, true, true], "Mint and redeem is paused");
-    await expect(dummyVault.connect(Alice).unpauseDeposit())
-      .to.emit(dummyVault, "DepositUnpaused")
-      .withArgs();
-    await expect(dummyVault.connect(Alice).unpauseSwap())
-      .to.emit(dummyVault, "SwapUnpaused")
-      .withArgs();
-    await expect(dummyVault.connect(Alice).unpauseClaimBribes())
-      .to.emit(dummyVault, "ClaimBribesUnpaused")
-      .withArgs();
-    expect(await dummyVault.paused()).to.deep.equal([false, false, false], "Mint and redeem is unpaused");
+    await expect(dummyVault.connect(Bob).pause()).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).pause())
+      .to.emit(dummyVault, "Paused")
+      .withArgs(Alice.address);
+    expect(await dummyVault.paused()).to.equal(true, "Paused");
+    await expect(dummyVault.connect(Bob).unpause()).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).unpause())
+      .to.emit(dummyVault, "Unpaused")
+      .withArgs(Alice.address);
+    expect(await dummyVault.paused()).to.deep.equal(false, "Unpaused");
 
     // Only admin could close a Vault
     await expect(dummyVault.connect(Bob).close()).to.be.revertedWith("Ownable: caller is not the owner");
     await expect(dummyVault.connect(Alice).close())
-      .to.emit(dummyVault, "VaultClosed")
+      .to.emit(dummyVault, "Closed")
       .withArgs();
     
     // Only admin could set briber

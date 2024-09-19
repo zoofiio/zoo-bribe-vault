@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 // import "hardhat/console.sol";
 
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -15,7 +16,7 @@ import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 
-contract RedeemPool is Context, ReentrancyGuard {
+contract RedeemPool is Context, Pausable, ReentrancyGuard {
   using Math for uint256;
   using SafeMath for uint256;
   using SafeERC20 for IERC20;
@@ -103,7 +104,7 @@ contract RedeemPool is Context, ReentrancyGuard {
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function redeem(uint256 amount) external nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
+  function redeem(uint256 amount) external nonReentrant whenNotPaused onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     // console.log('#redeem, amount: %s, msg.value: %s', amount, msg.value);
     require(amount > 0, "Cannot redeem 0");
     // require(msg.value == 0, "msg.value should be 0");
@@ -116,7 +117,7 @@ contract RedeemPool is Context, ReentrancyGuard {
     emit Redeem(_msgSender(), amount);
   }
 
-  function withdrawRedeem(uint256 amount) public nonReentrant onlyBeforeSettlement updateAssetAmount(_msgSender()) {
+  function withdrawRedeem(uint256 amount) public nonReentrant whenNotPaused onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     require(amount > 0, "Cannot withdraw 0");
     require(amount <= userRedeemingBalance(_msgSender()), "Insufficient redeeming balance");
 
@@ -147,6 +148,14 @@ contract RedeemPool is Context, ReentrancyGuard {
   }
 
   /* ========== RESTRICTED FUNCTIONS ========== */
+
+  function pause() external nonReentrant onlyVault {
+    _pause();
+  }
+
+  function unpause() external nonReentrant onlyVault {
+    _unpause();
+  }
 
   function notifySettlement(uint256 assetAmount) external nonReentrant onlyBeforeSettlement onlyVault {
     _settled = true;

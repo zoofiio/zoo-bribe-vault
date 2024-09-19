@@ -36,9 +36,9 @@ describe('Bribe Vault', () => {
     const bribeAmountBRB = ethers.parseUnits("2000", await brbToken.decimals());
 
     // Add bribe tokens to StakingPool
-    await expect(stakingPool.connect(Alice).addReward(await iBGT.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
-    await expect(stakingPool.connect(Alice).addReward(await brbToken.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
-    // expect(await stakingPool.rewardTokensLength()).to.equal(2);
+    // await expect(stakingPool.connect(Alice).addReward(await iBGT.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
+    // await expect(stakingPool.connect(Alice).addReward(await brbToken.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
+    // // expect(await stakingPool.rewardTokensLength()).to.equal(2);
 
     // No epochs initially
     expect(await vault.epochIdCount()).to.equal(0);
@@ -130,6 +130,8 @@ describe('Bribe Vault', () => {
     // Add bribes
     await expect(iBGT.connect(Alice).approve(await stakingPool.getAddress(), bribeAmountIBGT)).not.to.be.reverted;
     await expect(brbToken.connect(Alice).approve(await stakingPool.getAddress(), bribeAmountBRB)).not.to.be.reverted;
+    await expect(stakingPool.connect(Alice).addReward(await iBGT.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
+    await expect(stakingPool.connect(Alice).addReward(await brbToken.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
     await expect(stakingPool.connect(Alice).notifyRewardAmount(await iBGT.getAddress(), bribeAmountIBGT)).not.to.be.reverted;
     await expect(stakingPool.connect(Alice).notifyRewardAmount(await brbToken.getAddress(), bribeAmountBRB)).not.to.be.reverted;
 
@@ -267,7 +269,7 @@ describe('Bribe Vault', () => {
     // expect(iBGTBalanceBeforeClose).to.equal(0);
     console.log(`$iBGT balance before close: ${formatUnits(iBGTBalanceBeforeClose, await iBGT.decimals())}`);
     await expect(vault.connect(Alice).close())
-      .to.emit(vault, "VaultClosed").withArgs();
+      .to.emit(vault, "Closed").withArgs();
     let iBGTBalanceAfterClose = await iBGT.balanceOf(await vault.getAddress());
     console.log(`$iBGT balance after close: ${formatUnits(iBGTBalanceAfterClose, await iBGT.decimals())}`);
 
