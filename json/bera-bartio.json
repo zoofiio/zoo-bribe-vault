@@ -19,11 +19,11 @@
     ]
   },
   "VaultCalculator": {
-    "address": "0xa640F207B51c552609469e7BF4a63e0f258b75C4",
+    "address": "0x90404d6715Cd1eDfF3AD586fa59c2A7103deA688",
     "args": []
   },
   "HONEY-USDC-LP_Vault": {
-    "address": "0x64bCF8FDFAa854c445564697Aeb95e350a31F94E",
+    "address": "0x27F471FF2695FF7179902DC2C1e3b683EA372a98",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -34,7 +34,7 @@
     ]
   },
   "HONEY-WBERA-LP_1_Vault": {
-    "address": "0x686C72Aecf2D08410A8270D514B0Dc3Cc72e5288",
+    "address": "0x90e0A49726c2fF0fa6e4382446688AF883d10133",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -45,7 +45,7 @@
     ]
   },
   "HONEY-WBERA-LP_2_Vault": {
-    "address": "0xB0a0C11a77E67acBD161cc44743a1774f2C4Fff5",
+    "address": "0x9700FEa232560E4048DD924623491926282125bE",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
@@ -54,5 +54,9 @@
       "Zoo pHONEY-WBERA-LP",
       "pHONEY-BERA"
     ]
+  },
+  "CalcLiq": {
+    "address": "0xa6b985dDa4D24B66fd4Ac2041395a82DcAdfD877",
+    "args": []
   }
 }
