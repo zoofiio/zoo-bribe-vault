@@ -317,7 +317,7 @@ describe('RedeemPool', () => {
     console.log(`Bob redeeming balance: ${ethers.formatUnits(bobRedeemingBalances.toString(), await piBGT.decimals())}`);
     console.log(`Caro redeeming balance: ${ethers.formatUnits(caroRedeemingBalances.toString(), await piBGT.decimals())}`);
 
-    // Bob and Caros should not lose their deposits (but Alice donates some assets to the vault)
+    // Bob and Caro should not lose their deposits (but Alice donates some assets to the vault)
     expectBigNumberEquals(bobDepositAmount, bobRedeemingBalances);
     expectBigNumberEquals(caroDepositAmount, caroRedeemingBalances);
   });

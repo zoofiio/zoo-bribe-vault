@@ -305,23 +305,23 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   }
 
   function pause() external nonReentrant onlyOwner {
-    if (_currentEpochId.current() > 0) {
-      Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
-      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
-      redeemPool.pause();
-    }
-
     _pause();
   }
 
   function unpause() external nonReentrant onlyOwner {
-    if (_currentEpochId.current() > 0) {
-      Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
-      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
-      redeemPool.unpause();
-    }
-
     _unpause();
+  }
+
+  function pauseRedeemPool(uint256 epochId) external nonReentrant validEpochId(epochId) onlyOwner {
+    Constants.Epoch memory epoch = _epochs[epochId];
+    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+    redeemPool.pause();
+  }
+
+  function unpauseRedeemPool(uint256 epochId) external nonReentrant validEpochId(epochId) onlyOwner {
+    Constants.Epoch memory epoch = _epochs[epochId];
+    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+    redeemPool.unpause();
   }
 
   function setBriber(address account, bool briber) external nonReentrant onlyOwner {
