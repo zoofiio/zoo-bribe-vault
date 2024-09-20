@@ -85,7 +85,9 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   // $iBGT
   function earnedAssetAmount(address account) public view returns (uint256) {
-    return _userRedeemingShares[account].mul(_assetAmountPerRedeemingShare.sub(_userAssetAmountPerRedeemingSharePaid[account])).div(1e18).add(_userAssetAmounts[account]);
+    return _userRedeemingShares[account].mulDiv(
+      _assetAmountPerRedeemingShare.sub(_userAssetAmountPerRedeemingSharePaid[account]), 1e28
+    ).add(_userAssetAmounts[account]);
   }
 
   function getRedeemingSharesByBalance(uint256 stakingBalance) public virtual view onlyBeforeSettlement returns (uint256) {
@@ -161,7 +163,9 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     _settled = true;
     if (assetAmount > 0) {
       require(_totalRedeemingShares > 0, "No redeems");
-      _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(assetAmount.mul(1e18).div(_totalRedeemingShares));
+      _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(
+        assetAmount.mulDiv(1e28, _totalRedeemingShares)
+      );
     }
     emit Settlement(assetAmount);
   }
@@ -175,7 +179,10 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
       _userAssetAmounts[account] = 0;
 
       IProtocolSettings settings = IProtocolSettings(_vault.settings());
-      uint256 fees = amount.mul(settings.vaultParamValue(address(_vault), "f1")).div(10 ** settings.decimals());
+      uint256 fees = amount.mulDiv(
+        settings.vaultParamValue(address(_vault), "f1"),
+        10 ** settings.decimals()
+      );
       uint256 netAmount = amount.sub(fees);
 
       if (netAmount > 0) {

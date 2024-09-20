@@ -40,7 +40,7 @@ export async function deployContractsFixture() {
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   // const MockERC20 = await MockERC20Factory.deploy("ERC20 Mock", "MockERC20");
   // const erc20 = MockERC20__factory.connect(await MockERC20.getAddress(), provider);
-  const iBGTToken = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT Token", "iBGT");
+  const iBGTToken = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT Token", "iBGT", 18);
   const iBGT = MockERC20__factory.connect(await iBGTToken.getAddress(), provider);
 
   const MockRebasableERC20Factory = await ethers.getContractFactory("MockRebasableERC20");
@@ -142,7 +142,7 @@ export const getTime = async () => {
 
 export const makeToken = async (protocol: string, name: string, symbol: string, decimals: number = 18) => {
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
-  const ERC20 = await MockERC20Factory.deploy(protocol, name, symbol);
+  const ERC20 = await MockERC20Factory.deploy(protocol, name, symbol, 18);
   const erc20 = MockERC20__factory.connect(await ERC20.getAddress(), provider);
 
   const [Alice] = await ethers.getSigners();

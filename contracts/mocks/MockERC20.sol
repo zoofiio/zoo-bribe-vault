@@ -18,10 +18,11 @@ contract MockERC20 is ERC20, ERC20Burnable, ProtocolOwner, ReentrancyGuard {
   constructor(
     address _protocol,
     string memory name,
-    string memory symbol
+    string memory symbol,
+    uint8 _decimals_
   ) ProtocolOwner(_protocol) ERC20(name, symbol) {
     _setTester(owner(), true);
-    _decimals = 18;
+    _decimals = _decimals_;
   }
 
   /* ================= VIEWS ================ */

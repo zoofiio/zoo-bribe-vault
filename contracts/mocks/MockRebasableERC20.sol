@@ -13,7 +13,7 @@ contract MockRebasableERC20 is MockERC20 {
   constructor(
     address _protocol,
     string memory name, string memory symbol
-  ) MockERC20(_protocol, name, symbol) {
+  ) MockERC20(_protocol, name, symbol, 18) {
     
   }
 
