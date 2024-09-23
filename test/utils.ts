@@ -43,6 +43,9 @@ export async function deployContractsFixture() {
   const iBGTToken = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT Token", "iBGT", 18);
   const iBGT = MockERC20__factory.connect(await iBGTToken.getAddress(), provider);
 
+  const iBGT8Token = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT8 Token", "iBGT8", 8);
+  const iBGT8 = MockERC20__factory.connect(await iBGT8Token.getAddress(), provider);
+
   const MockRebasableERC20Factory = await ethers.getContractFactory("MockRebasableERC20");
   const MockRebasableERC20 = await MockRebasableERC20Factory.deploy(await protocol.getAddress(),"Liquid staked Ether 2.0", "stETH");
   const stETH = MockRebasableERC20__factory.connect(await MockRebasableERC20.getAddress(), provider);
@@ -65,14 +68,24 @@ export async function deployContractsFixture() {
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
   );
   const vault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
-
   let trans = await protocol.connect(Alice).addVault(await vault.getAddress());
+  await trans.wait();
+
+  const MockStakingPool8 = await MockStakingPoolFactory.deploy(await protocol.getAddress(), await iBGT8.getAddress());
+  const stakingPool8 = MockStakingPool__factory.connect(await MockStakingPool8.getAddress(), provider);
+
+  const iBGT8VaultContract = await VaultFactory.deploy(
+    await protocol.getAddress(), await settings.getAddress(), await stakingPool8.getAddress(),
+    await iBGT8.getAddress(), "Zoo piBGT8", "piBGT8"
+  );
+  const vault8 = Vault__factory.connect(await iBGT8VaultContract.getAddress(), provider);
+  trans = await protocol.connect(Alice).addVault(await vault8.getAddress());
   await trans.wait();
 
   return { 
     Alice, Bob, Caro, Dave,
-    protocol, settings, stakingPool,
-    iBGT, stETH, vaultCalculator, vault
+    protocol, settings, stakingPool, stakingPool8,
+    iBGT, iBGT8, stETH, vaultCalculator, vault, vault8
   };
 }
 
@@ -190,11 +203,11 @@ export async function expectedInitSwapParams(vault: Vault, S: number) {
   return { X, k0 };
 }
 
-export async function expectedSwapParamsOnDeposit(vault: Vault, m: number) {
+export async function expectedSwapParamsOnDeposit(vault: Vault, m: number, decimals: number) {
   const epochId = await vault.currentEpochId(); 
 
-  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** 18);
-  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18 + 10));
+  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** decimals);
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (decimals + decimals + 10));
 
   let X_updated = X;
 
@@ -204,11 +217,11 @@ export async function expectedSwapParamsOnDeposit(vault: Vault, m: number) {
   return { X_updated, k0_updated };
 }
 
-export async function expectedCalcSwap(vault: Vault, n: number) {
+export async function expectedCalcSwap(vault: Vault, n: number, decimals: number) {
   const epochId = await vault.currentEpochId();  // require epochId > 0
 
-  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** 18);
-  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (18 + 18));
+  let X = Number(await vault.epochNextSwapX(epochId)) / (10 ** decimals);
+  let k0 = Number(await vault.epochNextSwapK0(epochId)) / (10 ** (decimals + decimals));
 
   const epoch = await vault.epochInfoById(epochId);
   let deltaT = 0;

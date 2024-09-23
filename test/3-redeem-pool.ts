@@ -62,9 +62,9 @@ describe('RedeemPool', () => {
     await expect(trans).to.changeTokenBalances(
       piBGT,
       [Alice.address, await redeemPool.getAddress()],
-      [ethers.parseUnits("-0.1"), ethers.parseUnits("0.1")]
+      [ethers.parseUnits("-0.1", await piBGT.decimals()), ethers.parseUnits("0.1", await piBGT.decimals())]
     );
-    await expect(trans).to.emit(redeemPool, "Redeem").withArgs(Alice.address, ethers.parseEther("0.1"));
+    await expect(trans).to.emit(redeemPool, "Redeem").withArgs(Alice.address, ethers.parseUnits("0.1", await piBGT.decimals()));
     trans = await redeemPool.connect(Bob).redeem(ethers.parseUnits("0.2", await piBGT.decimals()));
     expect(await redeemPool.userRedeemingBalance(Alice.address)).to.equal(ethers.parseUnits("0.1", await piBGT.decimals()));
     expect(await redeemPool.userRedeemingBalance(Bob.address)).to.equal(ethers.parseUnits("0.2", await piBGT.decimals()));

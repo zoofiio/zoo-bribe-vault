@@ -67,7 +67,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       _settings != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
-    require(_assetToken_ != Constants.NATIVE_TOKEN, "Asset token cannot be NATIVE_TOKEN");
+    require(_assetToken_ != Constants.NATIVE_TOKEN);
+    require(IERC20Metadata(_assetToken_).decimals() <= 18);
 
     settings = _settings;
     stakingPool = IStakingPool(_stakingPool_);
