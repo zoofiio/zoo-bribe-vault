@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -38,11 +38,13 @@ library VaultCalculator {
 
     uint256 scale = 10 ** Constants.PROTOCOL_DECIMALS;
     uint256 decayPeriod = self.paramValue("D").div(30);
-    uint256 Y = k0.div(X).mul(scale).div(
-      scale + deltaT.mul(scale).div(decayPeriod)
-    ).mul(scale).div(
-      scale + deltaT.mul(scale).div(decayPeriod)
-    );
+    uint256 Y = k0.mulDiv(
+      scale,
+      scale + deltaT.mulDiv(scale, decayPeriod)
+    ).mulDiv(
+      scale,
+      scale + deltaT.mulDiv(scale, decayPeriod)
+    ).div(X);
 
     return Y;
   }
@@ -52,15 +54,15 @@ library VaultCalculator {
     uint256 APRi = self.paramValue("APRi");
 
     uint256 X = S;
-    console.log("calcInitSwapParams, X: %s", X);
+    // console.log("calcInitSwapParams, X: %s", X);
 
     // Y0 = X * APRi * D / 86400 / 365
-    uint256 Y0 = X.mul(APRi).mul(D).div(86400).div(365);   // scale: 10 ** 10
-    console.log("calcInitSwapParams, Y0: %s", Y0);
+    uint256 Y0 = X.mulDiv(APRi.mul(D), 86400 * 365);   // scale: 10 ** 10
+    // console.log("calcInitSwapParams, Y0: %s", Y0);
 
     // k0 = X * Y0
     uint256 k0 = X.mulDiv(Y0, 10 ** Constants.PROTOCOL_DECIMALS);   // scale: 1
-    console.log("calcInitSwapParams, k0: %s", k0);
+    // console.log("calcInitSwapParams, k0: %s", k0);
 
     return (X, k0);
   }
@@ -72,11 +74,11 @@ library VaultCalculator {
     uint256 X = self.epochNextSwapX(epochId);
     uint256 k0 = self.epochNextSwapK0(epochId);
     uint256 X_updated = X.add(m);
-    console.log("updateSwapParamsOnDeposit, X: %s, k0: %s, X_updated: %s", X, k0, X_updated);
+    // console.log("updateSwapParamsOnDeposit, X: %s, k0: %s, X_updated: %s", X, k0, X_updated);
 
     // k'0 = ((X + m) / X)^2 * k0 = (X + m) * (X + m) * k0 / X / X = X' * X' * k0 / X / X
     uint256 k0_updated = X_updated.mulDiv(X_updated, X).mulDiv(k0, X);  // scale: 1
-    console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated); 
+    // console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated); 
 
     return (X_updated, k0_updated);
   }
@@ -96,36 +98,33 @@ library VaultCalculator {
       // in a new epoch
       deltaT = 0;
     }
-    console.log("doCalcSwap, X: %s, k0: %s, deltaT: %s", X, k0, deltaT);
+    // console.log("doCalcSwap, X: %s, k0: %s, deltaT: %s", X, k0, deltaT);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
 
     uint256 decayPeriod = self.paramValue("D").div(30);
     Constants.Terms memory T;
     T.T1 = SCALE.add(
-      deltaT.mul(SCALE).div(decayPeriod)
+      deltaT.mulDiv(SCALE, decayPeriod)
     );  // scale: 18
-    console.log("doCalcSwap, n:%s, T1: %s", n, T.T1);
-
-    // console.log("doCalSwap, X.mul(n).mul(T.T1): %s", X.mul(n).mul(T.T1));
-    // console.log("doCalSwap, X.mul(n).mul(T.T1).mul(T.T1): %s", X.mul(n).mul(T.T1).mul(T.T1));
+    // console.log("doCalcSwap, n:%s, T1: %s", n, T.T1);
 
     // X * n * (1 + ∆t / 86400)2
     T.T2 = X.mulDiv(n.mulDiv(T.T1 * T.T1, SCALE), SCALE);   // scale: 1
-    console.log("doCalcSwap, T2: %s", T.T2);
+    // console.log("doCalcSwap, T2: %s", T.T2);
 
     // k0 + X * n * (1 + ∆t / 86400)2
     T.T3 = k0.add(T.T2);
-    console.log("doCalcSwap, T.T3: %s", T.T3);
+    // console.log("doCalcSwap, T.T3: %s", T.T3);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
     uint256 X_updated = X.mulDiv(k0, T.T3);
-    console.log("doCalcSwap, X_updated: %s", X_updated);
+    // console.log("doCalcSwap, X_updated: %s", X_updated);
 
     // m = X - X'
     uint256 m = X.sub(X_updated);
 
-    console.log("doCalcSwap, m: %s", m);
+    // console.log("doCalcSwap, m: %s", m);
 
     return (X_updated, m);
   }

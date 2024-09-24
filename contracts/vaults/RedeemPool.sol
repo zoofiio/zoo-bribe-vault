@@ -110,6 +110,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     // console.log('#redeem, amount: %s, msg.value: %s', amount, msg.value);
     require(amount > 0, "Cannot redeem 0");
     // require(msg.value == 0, "msg.value should be 0");
+    require(IERC20(_redeemingPToken).balanceOf(_msgSender()) >= amount, "Insufficient balance");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
     _totalRedeemingShares = _totalRedeemingShares.add(sharesAmount);

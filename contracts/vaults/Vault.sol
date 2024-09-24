@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -28,6 +29,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   using Counters for Counters.Counter;
   using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using EnumerableSet for EnumerableSet.AddressSet;
+  using Math for uint256;
   using SafeMath for uint256;
   using VaultCalculator for IVault;
 
@@ -171,6 +173,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
+    require(amount <= _assetToken.balanceOf(_msgSender()));
+
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
 
@@ -221,7 +225,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
 
-    uint256 fees = amount.mul(paramValue("f2")).div(10 ** IProtocolSettings(settings).decimals());
+    uint256 fees = amount.mulDiv(paramValue("f2"), 10 ** IProtocolSettings(settings).decimals());
     if (fees > 0) {
       TokensTransfer.transferTokens(address(_assetToken), address(this), IProtocolSettings(settings).treasury(), fees);
     }
