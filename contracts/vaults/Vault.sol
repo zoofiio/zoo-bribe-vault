@@ -187,11 +187,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
     // calculate initial X and k0 on epoch start
     if (_epochNextSwapK0[_currentEpochId.current()] == 0) {
-      uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)];
-      // for epochs with no yToken carried from previous epoch, we are doing first deposit
-      if (S == 0) {
-        S = yTokenAmount;
-      }
+      uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)] + yTokenAmount;
       (uint256 X, uint256 k0) = IVault(this).calcInitSwapParams(S);
       _epochNextSwapX[_currentEpochId.current()] = X;
       _epochNextSwapK0[_currentEpochId.current()] = k0;
