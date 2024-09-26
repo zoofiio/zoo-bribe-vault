@@ -11,12 +11,23 @@ interface MIVault is IVault {
 
     function closed() external view returns (bool);
 
+    function paused() external view returns (bool, bool, bool);
+
     function Y() external view returns (uint256);
 
     function calcBribes(
         uint256 epochId,
         address account
     ) external view returns (Constants.BribeInfo[] memory);
+
+    function bribeTotalAmount(
+        uint256 epochId,
+        address bribeToken
+    ) external view returns (uint256);
+
+    function assetTotalSwapAmount(
+        uint256 epochId
+    ) external view returns (uint256);
 }
 
 interface ERC20 is IERC20 {
@@ -61,6 +72,8 @@ contract BQuery is Ownable {
         address redeemPool;
         uint256 yTokenTotal;
         uint256 vaultYTokenBalance;
+        uint256 assetTotalSwapAmount;
+        uint256 yTokenAmountForSwapYT;
         bool settled;
     }
     struct BVault {
@@ -80,6 +93,7 @@ contract BQuery is Ownable {
         address bribeToken;
         uint256 bribeAmount;
         string bribeSymbol;
+        uint256 bribeTotalAmount;
     }
     struct BVaultEpochUser {
         uint256 epochId;
@@ -132,6 +146,10 @@ contract BQuery is Ownable {
                 bveu.bribes[i].bribeToken = bis[i].bribeToken;
                 bveu.bribes[i].bribeAmount = bis[i].bribeAmount;
                 bveu.bribes[i].bribeSymbol = ERC20(bis[i].bribeToken).symbol();
+                bveu.bribes[i].bribeTotalAmount = ibv.bribeTotalAmount(
+                    epochId,
+                    bis[i].bribeToken
+                );
             }
         }
         IRedeemPool irp = IRedeemPool(ibv.epochInfoById(epochId).redeemPool);
@@ -155,7 +173,11 @@ contract BQuery is Ownable {
         bv.pTokenTotal = IPToken(pToken).totalSupply();
         bv.lockedAssetTotal = ibv.assetBalance();
         bv.f2 = ibv.paramValue("f2");
-        bv.closed = ibv.closed();
+        try ibv.closed() {
+            bv.closed = ibv.closed();
+        } catch {
+            (bv.closed, , ) = ibv.paused();
+        }
         bv.Y = ibv.Y();
         if (bv.epochCount > 0) {
             bv.current = _queryBVaultEpoch(vault, bv.epochCount);
@@ -189,6 +211,8 @@ contract BQuery is Ownable {
         bve.redeemPool = epoch.redeemPool;
         bve.yTokenTotal = ibv.yTokenTotalSupply(epochId);
         bve.vaultYTokenBalance = ibv.yTokenUserBalance(epochId, vault);
+        bve.assetTotalSwapAmount = ibv.assetTotalSwapAmount(epochId);
+        bve.yTokenAmountForSwapYT = bve.yTokenTotal - bve.vaultYTokenBalance;
         bve.settled = IRedeemPool(epoch.redeemPool).settled();
     }
 

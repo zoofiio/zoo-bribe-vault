@@ -15,12 +15,12 @@ async function main() {
   for (const lp of lps) {
     await bQuery.setLP(lp, true).then((tx) => tx.wait(2));
   }
-  const vualt = '0x90e0A49726c2fF0fa6e4382446688AF883d10133';
-  const current = await bQuery.queryBVault(vualt);
+  const vault = '0x686C72Aecf2D08410A8270D514B0Dc3Cc72e5288';
+  const current = await bQuery.queryBVault(vault);
   console.info("bVault", current);
   for (let i = current.epochCount; i > 0n; i--) {
-    console.info("epoch:", i, await bQuery.queryBVaultEpoch("0x90e0A49726c2fF0fa6e4382446688AF883d10133", i));
-    console.info("epoch:", i, await bQuery.queryBVaultEpochUser("0x90e0A49726c2fF0fa6e4382446688AF883d10133", i, deployer.address));
+    console.info("epoch:", i, await bQuery.queryBVaultEpoch(vault, i));
+    console.info("epoch:", i, await bQuery.queryBVaultEpochUser(vault, i, deployer.address));
 
   }
 
