@@ -58,5 +58,20 @@
   "CalcLiq": {
     "address": "0xa6b985dDa4D24B66fd4Ac2041395a82DcAdfD877",
     "args": []
+  },
+  "HONEY-WBERA-LP_3_Vault": {
+    "address": "0xF4396DEe48A44A2191ec5763Fc4b6E5aDE7e41e7",
+    "args": [
+      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
+      "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
+      "0x5c5f9a838747fb83678ECe15D85005FD4F558237",
+      "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7",
+      "Zoo pHONEY-WBERA-LP",
+      "pHONEY-BERA"
+    ]
+  },
+  "BQuery": {
+    "address": "0xF802796b6612378Ed2f4881b5484DBf36e6fC112",
+    "args": []
   }
 }
