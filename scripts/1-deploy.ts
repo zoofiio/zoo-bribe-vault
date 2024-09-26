@@ -111,6 +111,7 @@ async function main() {
   );
   await addVault(honeyWBeraLPVaultAddress1)
   console.log("Added honeyWberaLP vault1 to protocol");
+
   const honeyWBeraLPVaultAddress2 = await deployContract(
     "Vault",
     [protocolAddress, protocolSettingsAddress, honeyWberaStakingPoolAddress, honeyWberaLpAddress, "Zoo pHONEY-WBERA-LP", "pHONEY-BERA"],
@@ -122,11 +123,28 @@ async function main() {
     }
   );
   console.info(
-    "HONEY-WBERA-LP_1_Vault pToken:", 
+    "HONEY-WBERA-LP_2_Vault pToken:", 
     await Vault__factory.connect(honeyWBeraLPVaultAddress2, ethers.provider).pToken()
   );
   await addVault(honeyWBeraLPVaultAddress2)
   console.log("Added honeyWberaLP vault2 to protocol");
+
+  const honeyWBeraLPVaultAddress3 = await deployContract(
+    "Vault",
+    [protocolAddress, protocolSettingsAddress, honeyWberaStakingPoolAddress, honeyWberaLpAddress, "Zoo pHONEY-WBERA-LP", "pHONEY-BERA"],
+    "HONEY-WBERA-LP_3_Vault",
+    {
+      libraries: {
+        VaultCalculator: vaultCalculatorAddress,
+      },
+    }
+  );
+  console.info(
+    "HONEY-WBERA-LP_3_Vault pToken:", 
+    await Vault__factory.connect(honeyWBeraLPVaultAddress3, ethers.provider).pToken()
+  );
+  await addVault(honeyWBeraLPVaultAddress3)
+  console.log("Added honeyWberaLP vault3 to protocol");
 
 }
 
