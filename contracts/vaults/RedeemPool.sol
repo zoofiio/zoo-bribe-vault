@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
@@ -18,7 +17,6 @@ import "../interfaces/IZooProtocol.sol";
 
 contract RedeemPool is Context, Pausable, ReentrancyGuard {
   using Math for uint256;
-  using SafeMath for uint256;
   using SafeERC20 for IERC20;
 
   /* ========== STATE VARIABLES ========== */
@@ -86,8 +84,8 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
   // $iBGT
   function earnedAssetAmount(address account) public view returns (uint256) {
     return _userRedeemingShares[account].mulDiv(
-      _assetAmountPerRedeemingShare.sub(_userAssetAmountPerRedeemingSharePaid[account]), 1e28
-    ).add(_userAssetAmounts[account]);
+      _assetAmountPerRedeemingShare - _userAssetAmountPerRedeemingSharePaid[account], 1e28
+    ) + _userAssetAmounts[account];
   }
 
   function getRedeemingSharesByBalance(uint256 stakingBalance) public virtual view onlyBeforeSettlement returns (uint256) {
@@ -113,8 +111,8 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     require(IERC20(_redeemingPToken).balanceOf(_msgSender()) >= amount, "Insufficient balance");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
-    _totalRedeemingShares = _totalRedeemingShares.add(sharesAmount);
-    _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()].add(sharesAmount);
+    _totalRedeemingShares = _totalRedeemingShares + sharesAmount;
+    _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] + sharesAmount;
 
     TokensTransfer.transferTokens(_redeemingPToken, _msgSender(), address(this), amount);
     emit Redeem(_msgSender(), amount);
@@ -125,8 +123,8 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     require(amount <= userRedeemingBalance(_msgSender()), "Insufficient redeeming balance");
 
     uint256 sharesAmount = getRedeemingSharesByBalance(amount);
-    _totalRedeemingShares = _totalRedeemingShares.sub(sharesAmount);
-    _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()].sub(sharesAmount);
+    _totalRedeemingShares = _totalRedeemingShares - sharesAmount;
+    _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] - sharesAmount;
 
     TokensTransfer.transferTokens(_redeemingPToken, address(this), _msgSender(), amount);
     emit WithdrawRedeem(_msgSender(), amount);
@@ -164,7 +162,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     _settled = true;
     if (assetAmount > 0) {
       require(_totalRedeemingShares > 0, "No redeems");
-      _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare.add(
+      _assetAmountPerRedeemingShare = _assetAmountPerRedeemingShare + (
         assetAmount.mulDiv(1e28, _totalRedeemingShares)
       );
     }
@@ -184,7 +182,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
         settings.vaultParamValue(address(_vault), "f1"),
         10 ** settings.decimals()
       );
-      uint256 netAmount = amount.sub(fees);
+      uint256 netAmount = amount - fees;
 
       if (netAmount > 0) {
         TokensTransfer.transferTokens(_assetToken, address(this), account, netAmount);

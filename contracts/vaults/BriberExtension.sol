@@ -15,7 +15,7 @@ contract BriberExtension {
   }
 
   function getBriber(uint256 index) public view returns (address) {
-    require(index < _bribers.length(), "Invalid index");
+    require(index < _bribers.length());
     return _bribers.at(index);
   }
 
@@ -27,11 +27,11 @@ contract BriberExtension {
 
   function _setBriber(address account, bool briber) internal {
     if (briber) {
-      require(!_bribers.contains(account), "Address is already briber");
+      require(!_bribers.contains(account));
       _bribers.add(account);
     }
     else {
-      require(_bribers.contains(account), "Address was not briber");
+      require(_bribers.contains(account));
       _bribers.remove(account);
     }
 

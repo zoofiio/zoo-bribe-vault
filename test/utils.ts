@@ -63,6 +63,8 @@ export async function deployContractsFixture() {
       VaultCalculator: await vaultCalculator.getAddress(),
     }
   });
+  // console.log(`Vault code size: ${VaultFactory.bytecode.length / 2} bytes. (max: ${maxContractSize} bytes)`);
+
   const iBGTVaultContract = await VaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
