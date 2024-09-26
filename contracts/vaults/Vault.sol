@@ -168,7 +168,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
+  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(true) {
     require(amount <= _assetToken.balanceOf(_msgSender()));
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
@@ -212,8 +212,13 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
-  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction {
+  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(false) {
     require(IERC20(_pToken).totalSupply() > 0, "No principal tokens");
+    require(amount <= _assetToken.balanceOf(_msgSender()));
+
+    require(_currentEpochId.current() > 0);
+    Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
+    require(block.timestamp <= epoch.startTime + epoch.duration, "Epoch ended");
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
 
@@ -237,7 +242,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)] - yTokenAmount;
     _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()] + yTokenAmount;
 
-    Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
     uint256 yTokenAmountSynthetic = yTokenAmount * (epoch.startTime + epoch.duration - block.timestamp);
     _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] + yTokenAmountSynthetic;
     _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()] + yTokenAmountSynthetic;
@@ -251,9 +255,9 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     require(block.timestamp > epochEndTime, "Epoch not ended yet");
 
     uint256 yTokenBalanceSynthetic = _yTokenUserBalancesSynthetic[epochId][_msgSender()];
-    require(yTokenBalanceSynthetic > 0, "No yToken balance");
+    require(yTokenBalanceSynthetic > 0);
     uint256 yTokenTotalSynthetic = _yTokenTotalSupplySynthetic[epochId];
-    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
+    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic);
 
     Constants.BribeInfo[] memory bribeInfo = calcBribes(epochId, _msgSender());
     for (uint256 i = 0; i < bribeInfo.length; i++) {
@@ -464,16 +468,18 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _;
   }
 
-  modifier onUserAction() {
-    // Start first epoch
-    if (_currentEpochId.current() == 0) {
-      _startNewEpoch();
-    }
-    else {
-      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-      if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
-        _onEndEpoch(_currentEpochId.current());
+  modifier onUserAction(bool autoStartEpoch) {
+    if (autoStartEpoch) {
+      // Start first epoch
+      if (_currentEpochId.current() == 0) {
         _startNewEpoch();
+      }
+      else {
+        Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+        if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
+          _onEndEpoch(_currentEpochId.current());
+          _startNewEpoch();
+        }
       }
     }
     _updateBribes();

@@ -25,7 +25,7 @@ library VaultCalculator {
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
       // in current epoch
       deltaT = block.timestamp.sub(epoch.startTime);
-    } 
+    }
     else {
       // in a new epoch
       deltaT = 0;
