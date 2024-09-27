@@ -155,6 +155,7 @@ contract BQuery is Ownable {
         IRedeemPool irp = IRedeemPool(ibv.epochInfoById(epochId).redeemPool);
         if (!irp.settled()) {
             bveu.redeemingBalance = irp.userRedeemingBalance(user);
+        }else { 
             bveu.claimableAssetBalance = irp.earnedAssetAmount(user);
         }
         bveu.userBalanceYToken = ibv.yTokenUserBalance(epochId, user);
