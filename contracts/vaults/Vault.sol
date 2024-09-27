@@ -234,6 +234,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
     _assetTotalSwapAmount[_currentEpochId.current()] = _assetTotalSwapAmount[_currentEpochId.current()] + netAmount;
 
+    require(_epochNextSwapK0[_currentEpochId.current()] > 0);
     (uint256 X, uint256 m) = calcSwap(netAmount);
     _epochNextSwapX[_currentEpochId.current()] = X;
 
