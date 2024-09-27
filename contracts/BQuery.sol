@@ -155,7 +155,7 @@ contract BQuery is Ownable {
         IRedeemPool irp = IRedeemPool(ibv.epochInfoById(epochId).redeemPool);
         if (!irp.settled()) {
             bveu.redeemingBalance = irp.userRedeemingBalance(user);
-        }else { 
+        } else {
             bveu.claimableAssetBalance = irp.earnedAssetAmount(user);
         }
         bveu.userBalanceYToken = ibv.yTokenUserBalance(epochId, user);
@@ -164,7 +164,7 @@ contract BQuery is Ownable {
             user
         );
     }
-
+    
     function _queryBVault(
         address vault
     ) internal view returns (BVault memory bv) {
@@ -174,12 +174,18 @@ contract BQuery is Ownable {
         bv.pTokenTotal = IPToken(pToken).totalSupply();
         bv.lockedAssetTotal = ibv.assetBalance();
         bv.f2 = ibv.paramValue("f2");
+        (bool successY, bytes memory data) = vault.staticcall(
+            abi.encodeWithSignature("Y()")
+        );
+        if (successY) {
+            bv.Y = abi.decode(data, (uint256));
+        }
+
         try ibv.closed() {
             bv.closed = ibv.closed();
         } catch {
             (bv.closed, , ) = ibv.paused();
         }
-        bv.Y = ibv.Y();
         if (bv.epochCount > 0) {
             bv.current = _queryBVaultEpoch(vault, bv.epochCount);
         }
@@ -213,7 +219,11 @@ contract BQuery is Ownable {
         bve.yTokenTotal = ibv.yTokenTotalSupply(epochId);
         bve.vaultYTokenBalance = ibv.yTokenUserBalance(epochId, vault);
         bve.assetTotalSwapAmount = ibv.assetTotalSwapAmount(epochId);
-        bve.yTokenAmountForSwapYT = bve.yTokenTotal - bve.vaultYTokenBalance;
+        if (bve.yTokenTotal > bve.vaultYTokenBalance) {
+            bve.yTokenAmountForSwapYT =
+                bve.yTokenTotal -
+                bve.vaultYTokenBalance;
+        }
         bve.settled = IRedeemPool(epoch.redeemPool).settled();
     }
 
