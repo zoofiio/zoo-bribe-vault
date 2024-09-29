@@ -168,7 +168,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(true) {
+  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(amount) {
     require(amount <= _assetToken.balanceOf(_msgSender()));
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
@@ -180,16 +180,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
     uint256 yTokenAmount = amount;
-
-    // calculate initial X and k0 on epoch start
-    if (_epochNextSwapK0[_currentEpochId.current()] == 0) {
-      uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)] + yTokenAmount;
-      (uint256 X, uint256 k0) = IVault(this).calcInitSwapParams(S);
-      _epochNextSwapX[_currentEpochId.current()] = X;
-      _epochNextSwapK0[_currentEpochId.current()] = k0;
-    }
-    // update X and k0 on new deposit
-    else {
+    if (_epochNextSwapK0[_currentEpochId.current()] > 0) {
+      // update X and k0 on new deposit
       (uint256 X, uint256 k0) = IVault(this).updateSwapParamsOnDeposit(yTokenAmount);
       _epochNextSwapX[_currentEpochId.current()] = X;
       _epochNextSwapK0[_currentEpochId.current()] = k0;
@@ -212,7 +204,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
-  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(false) {
+  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(0) {
     require(IERC20(_pToken).totalSupply() > 0, "No principal tokens");
     require(amount <= _assetToken.balanceOf(_msgSender()));
 
@@ -370,7 +362,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     redeemPool.notifySettlement(amount);
   }
 
-  function _startNewEpoch() internal {
+  function _startNewEpoch(uint256 deltaYTokenAmount) internal {
     uint256 oldEpochId = _currentEpochId.current();
 
     _currentEpochId.increment();
@@ -389,6 +381,12 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       _yTokenTotalSupply[epochId] = yTokenAmount;
       _yTokenUserBalances[epochId][address(this)] = yTokenAmount;
     }
+
+    // initialize swap params
+    uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)] + deltaYTokenAmount;
+    (uint256 X, uint256 k0) = IVault(this).calcInitSwapParams(S);
+    _epochNextSwapX[_currentEpochId.current()] = X;
+    _epochNextSwapK0[_currentEpochId.current()] = k0;
   }
 
   function _updateBribes() internal {
@@ -469,18 +467,16 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _;
   }
 
-  modifier onUserAction(bool autoStartEpoch) {
-    if (autoStartEpoch) {
-      // Start first epoch
-      if (_currentEpochId.current() == 0) {
-        _startNewEpoch();
-      }
-      else {
-        Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-        if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
-          _onEndEpoch(_currentEpochId.current());
-          _startNewEpoch();
-        }
+  modifier onUserAction(uint256 deltaYTokenAmount) {
+    // Start first epoch
+    if (_currentEpochId.current() == 0) {
+      _startNewEpoch(deltaYTokenAmount);
+    }
+    else {
+      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
+        _onEndEpoch(_currentEpochId.current());
+        _startNewEpoch(deltaYTokenAmount);
       }
     }
     _updateBribes();

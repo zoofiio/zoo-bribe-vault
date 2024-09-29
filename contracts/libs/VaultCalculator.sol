@@ -20,6 +20,9 @@ library VaultCalculator {
   function calcY(IVault self) public view returns (uint256) {
     uint256 epochId = self.currentEpochId();
 
+    uint256 X = self.epochNextSwapX(epochId);
+    uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 1
+
     uint256 deltaT = 0;
     Constants.Epoch memory epoch = self.epochInfoById(epochId);
     if (epoch.startTime.add(epoch.duration) >= block.timestamp) {
@@ -29,13 +32,11 @@ library VaultCalculator {
     else {
       // in a new epoch
       deltaT = 0;
+      uint256 S = self.yTokenUserBalance(epochId, address(self));
+      (X, k0) = calcInitSwapParams(self, S);
     }
 
     // Y = k0 / (X * (1 + ∆t / 86400)2) = k0 / X / (1 + ∆t / 86400) / (1 + ∆t / 86400)
-    uint256 X = self.epochNextSwapX(epochId);
-    require(X > 0, "Invalid X");
-    uint256 k0 = self.epochNextSwapK0(epochId);   // scale: 1
-
     uint256 scale = 10 ** Constants.PROTOCOL_DECIMALS;
     uint256 decayPeriod = self.paramValue("D").div(30);
     uint256 Y = k0.mulDiv(
@@ -97,7 +98,10 @@ library VaultCalculator {
     else {
       // in a new epoch
       deltaT = 0;
+      uint256 S = self.yTokenUserBalance(epochId, address(self));
+      (X, k0) = calcInitSwapParams(self, S);
     }
+
     // console.log("doCalcSwap, X: %s, k0: %s, deltaT: %s", X, k0, deltaT);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
