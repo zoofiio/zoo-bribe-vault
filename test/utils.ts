@@ -11,6 +11,7 @@ import {
   Vault__factory,
   VaultCalculator__factory,
   MockStakingPool__factory,
+  RedeemPoolFactory__factory,
   Vault,
 } from "../typechain";
 
@@ -36,6 +37,10 @@ export async function deployContractsFixture() {
   expect(ProtocolSettingsFactory.bytecode.length / 2).lessThan(maxContractSize);
   const ProtocolSettings = await ProtocolSettingsFactory.deploy(await protocol.getAddress(), Ivy.address);
   const settings = ProtocolSettings__factory.connect(await ProtocolSettings.getAddress(), provider);
+
+  const RedeemPoolFactoryFactory = await ethers.getContractFactory("RedeemPoolFactory");
+  const RedeemPoolFactory = await RedeemPoolFactoryFactory.deploy(await protocol.getAddress());
+  const redeemPoolFactory = RedeemPoolFactory__factory.connect(await RedeemPoolFactory.getAddress(), provider);
   
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   // const MockERC20 = await MockERC20Factory.deploy("ERC20 Mock", "MockERC20");
@@ -66,7 +71,9 @@ export async function deployContractsFixture() {
   // console.log(`Vault code size: ${VaultFactory.bytecode.length / 2} bytes. (max: ${maxContractSize} bytes)`);
 
   const iBGTVaultContract = await VaultFactory.deploy(
-    await protocol.getAddress(), await settings.getAddress(), await stakingPool.getAddress(),
+    await protocol.getAddress(), await settings.getAddress(), 
+    await redeemPoolFactory.getAddress(),
+    await stakingPool.getAddress(),
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
   );
   const vault = Vault__factory.connect(await iBGTVaultContract.getAddress(), provider);
@@ -77,7 +84,9 @@ export async function deployContractsFixture() {
   const stakingPool8 = MockStakingPool__factory.connect(await MockStakingPool8.getAddress(), provider);
 
   const iBGT8VaultContract = await VaultFactory.deploy(
-    await protocol.getAddress(), await settings.getAddress(), await stakingPool8.getAddress(),
+    await protocol.getAddress(), await settings.getAddress(),
+    await redeemPoolFactory.getAddress(),
+    await stakingPool8.getAddress(),
     await iBGT8.getAddress(), "Zoo piBGT8", "piBGT8"
   );
   const vault8 = Vault__factory.connect(await iBGT8VaultContract.getAddress(), provider);
@@ -86,7 +95,7 @@ export async function deployContractsFixture() {
 
   return { 
     Alice, Bob, Caro, Dave,
-    protocol, settings, stakingPool, stakingPool8,
+    protocol, settings, redeemPoolFactory, stakingPool, stakingPool8,
     iBGT, iBGT8, stETH, vaultCalculator, vault, vault8
   };
 }

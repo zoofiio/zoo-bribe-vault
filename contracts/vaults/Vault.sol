@@ -15,12 +15,13 @@ import "../libs/TokensTransfer.sol";
 import "../libs/VaultCalculator.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
+import "../interfaces/IRedeemPool.sol";
+import "../interfaces/IRedeemPoolFactory.sol";
 import "../interfaces/IStakingPool.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
 import "../tokens/PToken.sol";
-import "./RedeemPool.sol";
 import "./BriberExtension.sol";
 
 contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtension {
@@ -33,6 +34,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   address public immutable settings;
   IStakingPool public stakingPool;
+  IRedeemPoolFactory public redeemPoolFactory;
 
   IERC20 internal immutable _assetToken;
   IPToken internal immutable _pToken;
@@ -57,18 +59,20 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   constructor(
     address _protocol,
     address _settings,
+    address _redeemPoolFactory,
     address _stakingPool_,
     address _assetToken_,
     string memory _pTokenName, string memory _pTokensymbol
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
+      _settings != address(0) && _redeemPoolFactory != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN);
     require(IERC20Metadata(_assetToken_).decimals() <= 18);
 
     settings = _settings;
+    redeemPoolFactory = IRedeemPoolFactory(_redeemPoolFactory);
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
@@ -270,7 +274,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   function batchClaimRedeemAssets(uint256[] memory epochIds) external nonReentrant {
     for (uint256 i = 0; i < epochIds.length; i++) {
       Constants.Epoch memory epoch = _epochs[epochIds[i]];
-      RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+      IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
       redeemPool.claimAssetTokenFor(_msgSender());
     }
   }
@@ -308,13 +312,13 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   function pauseRedeemPool(uint256 epochId) external nonReentrant validEpochId(epochId) onlyOwner {
     Constants.Epoch memory epoch = _epochs[epochId];
-    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+    IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
     redeemPool.pause();
   }
 
   function unpauseRedeemPool(uint256 epochId) external nonReentrant validEpochId(epochId) onlyOwner {
     Constants.Epoch memory epoch = _epochs[epochId];
-    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+    IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
     redeemPool.unpause();
   }
 
@@ -350,7 +354,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     // console.log("_onEndEpoch, end epoch %s", epochId);
     Constants.Epoch memory epoch = _epochs[epochId];
 
-    RedeemPool redeemPool = RedeemPool(epoch.redeemPool);
+    IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
 
     uint256 amount = redeemPool.totalRedeemingBalance();
     if (amount > 0) {
@@ -372,7 +376,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _epochs[epochId].epochId = epochId;
     _epochs[epochId].startTime = block.timestamp;
     _epochs[epochId].duration = paramValue("D");
-    _epochs[epochId].redeemPool = address(new RedeemPool(address(this)));
+    _epochs[epochId].redeemPool = redeemPoolFactory.createRedeemPool(address(this));
 
     emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool);
 

@@ -35,11 +35,6 @@ describe('Bribe Vault', () => {
     await expect(brbToken.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await brbToken.decimals()))).not.to.be.reverted;
     const bribeAmountBRB = ethers.parseUnits("2000", await brbToken.decimals());
 
-    // Add bribe tokens to StakingPool
-    // await expect(stakingPool.connect(Alice).addReward(await iBGT.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
-    // await expect(stakingPool.connect(Alice).addReward(await brbToken.getAddress(), Alice.address, 10 * ONE_DAY_IN_SECS)).not.to.be.reverted;
-    // // expect(await stakingPool.rewardTokensLength()).to.equal(2);
-
     // No epochs initially
     expect(await vault.epochIdCount()).to.equal(0);
     await expect(vault.epochIdAt(0)).to.be.reverted; // OutOfBounds
