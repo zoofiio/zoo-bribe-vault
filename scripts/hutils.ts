@@ -45,13 +45,7 @@ export async function deployContract(name: string, args: any[], saveName?: strin
   }
 }
 
-export async function deployUseCreate2(
-  name: string,
-  salt: string,
-  typeargs: any[] = [],
-  saveName?: string,
-  factoryOptions?: FactoryOptions
-) {
+export async function deployUseCreate2(name: string, salt: string, typeargs: any[] = [], saveName?: string, factoryOptions?: FactoryOptions) {
   const showName = saveName || name;
   const AddCreate2 = "0x0000000000FFe8B47B3e2130213B802212439497";
   const immutableCreate2 = await ethers.getContractAt("ImmutableCreate2FactoryInterface", AddCreate2);
@@ -84,30 +78,30 @@ export async function verfiy(key: string) {
     return;
   }
   let taskArguments = {
-    address: item.address
+    address: item.address,
   };
 
   if (item.contract) {
     taskArguments = {
       ...taskArguments,
-      contract: item.contract
+      contract: item.contract,
     };
   }
 
   if (item.args) {
     taskArguments = {
       ...taskArguments,
-      constructorArguments: item.args
+      constructorArguments: item.args,
     };
   } else if (item.typeargs) {
     taskArguments = {
       ...taskArguments,
-      constructorArguments: item.typeargs.slice(item.typeargs.length / 2)
+      constructorArguments: item.typeargs.slice(item.typeargs.length / 2),
     };
   }
 
   await run("verify:verify", {
-    ...taskArguments
+    ...taskArguments,
   }).catch((error) => {
     console.error(error);
   });
@@ -121,7 +115,7 @@ export async function verifyAll() {
   }
 }
 
-export function wait1Tx<T extends TransactionResponse>(tx: T) {
+export function wait1Tx<T extends { wait: (num: number) => Promise<any> }>(tx: T) {
   return tx.wait(1);
 }
 
