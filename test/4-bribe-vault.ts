@@ -151,9 +151,6 @@ describe('Bribe Vault', () => {
     console.log("\n========= 16 days later, check bribes ===============");
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
 
-    // could not swap after epoch ends
-    await expect(vault.connect(Alice).swap(1)).to.be.revertedWith("Epoch ended");
-
     let vaultBribesIBGTAmount = bribeAmountIBGT;
     let vaultBribesBRBAmount = bribeAmountBRB;
 

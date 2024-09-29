@@ -172,8 +172,10 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   /* ========== MUTATIVE FUNCTIONS ========== */
 
-  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(amount) {
+  function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) {
     require(amount <= _assetToken.balanceOf(_msgSender()));
+
+    bool newEpoch = _onUserAction(amount);
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
     stakingPool.stake(amount);
@@ -184,8 +186,9 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
     uint256 yTokenAmount = amount;
-    if (_epochNextSwapK0[_currentEpochId.current()] > 0) {
+    if (!newEpoch) {
       // update X and k0 on new deposit
+      require(_epochNextSwapK0[_currentEpochId.current()] > 0);
       (uint256 X, uint256 k0) = IVault(this).updateSwapParamsOnDeposit(yTokenAmount);
       _epochNextSwapX[_currentEpochId.current()] = X;
       _epochNextSwapK0[_currentEpochId.current()] = k0;
@@ -208,9 +211,11 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
-  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) onUserAction(0) {
+  function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) {
     require(IERC20(_pToken).totalSupply() > 0, "No principal tokens");
     require(amount <= _assetToken.balanceOf(_msgSender()));
+
+    _onUserAction(0);
 
     require(_currentEpochId.current() > 0);
     Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
@@ -350,6 +355,26 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   /* ========== INTERNAL FUNCTIONS ========== */
 
+  function _onUserAction(uint256 deltaYTokenAmount) internal returns (bool) {
+    bool newEpoch = false;
+    // Start first epoch
+    if (_currentEpochId.current() == 0) {
+      _startNewEpoch(deltaYTokenAmount);
+      newEpoch = true;
+    }
+    else {
+      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
+        _onEndEpoch(_currentEpochId.current());
+        _startNewEpoch(deltaYTokenAmount);
+        newEpoch = true;
+      }
+    }
+    _updateBribes();
+
+    return newEpoch;
+  }
+
   function _onEndEpoch(uint256 epochId) internal {
     // console.log("_onEndEpoch, end epoch %s", epochId);
     Constants.Epoch memory epoch = _epochs[epochId];
@@ -468,23 +493,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       epochId > 0 && epochId <= _currentEpochId.current() && _epochs[epochId].startTime > 0,
       "Invalid epoch id"
     );
-    _;
-  }
-
-  modifier onUserAction(uint256 deltaYTokenAmount) {
-    // Start first epoch
-    if (_currentEpochId.current() == 0) {
-      _startNewEpoch(deltaYTokenAmount);
-    }
-    else {
-      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
-      if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
-        _onEndEpoch(_currentEpochId.current());
-        _startNewEpoch(deltaYTokenAmount);
-      }
-    }
-    _updateBribes();
-
     _;
   }
 
