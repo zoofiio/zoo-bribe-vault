@@ -327,6 +327,10 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     redeemPool.unpause();
   }
 
+  function updateRedeemPoolFactory(address newRedeemPoolFactory) external nonReentrant onlyOwner {
+    redeemPoolFactory = IRedeemPoolFactory(newRedeemPoolFactory);
+  }
+
   function setBriber(address account, bool briber) external nonReentrant onlyOwner {
     _setBriber(account, briber);
   }

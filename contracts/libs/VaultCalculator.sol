@@ -3,11 +3,13 @@ pragma solidity ^0.8.18;
 
 // import "hardhat/console.sol";
 
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./Constants.sol";
 import "../interfaces/IProtocolSettings.sol";
+import "../interfaces/IRedeemPool.sol";
 import "../interfaces/IVault.sol";
 
 library VaultCalculator {
@@ -16,6 +18,17 @@ library VaultCalculator {
   using SafeMath for uint256;
 
   uint256 public constant SCALE = 10 ** 18;
+
+  function calcNewEpochS(IVault self) public view returns (uint256) {
+    address pToken = self.pToken();
+    uint256 pTokenTotalSupply = IERC20(pToken).totalSupply();
+
+    Constants.Epoch memory epoch = self.epochInfoById(self.currentEpochId());
+    IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
+    uint256 pTokenRedeemingAmount = redeemPool.totalRedeemingBalance();
+
+    return pTokenTotalSupply.sub(pTokenRedeemingAmount);
+  }
 
   function calcY(IVault self) public view returns (uint256) {
     uint256 epochId = self.currentEpochId();
@@ -32,7 +45,7 @@ library VaultCalculator {
     else {
       // in a new epoch
       deltaT = 0;
-      uint256 S = self.yTokenUserBalance(epochId, address(self));
+      uint256 S = calcNewEpochS(self);
       (X, k0) = calcInitSwapParams(self, S);
     }
 
@@ -98,7 +111,7 @@ library VaultCalculator {
     else {
       // in a new epoch
       deltaT = 0;
-      uint256 S = self.yTokenUserBalance(epochId, address(self));
+      uint256 S = calcNewEpochS(self);
       (X, k0) = calcInitSwapParams(self, S);
     }
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 interface IRedeemPool {
 
-  function totalRedeemingBalance() external returns (uint256);
+  function totalRedeemingBalance() external view returns (uint256);
 
   function claimAssetTokenFor(address account) external;
 
