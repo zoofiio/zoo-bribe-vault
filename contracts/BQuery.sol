@@ -11,7 +11,7 @@ interface MIVault is IVault {
 
     function closed() external view returns (bool);
 
-    function paused() external view returns (bool, bool, bool);
+    function paused() external view returns (bool);
 
     function Y() external view returns (uint256);
 
@@ -74,6 +74,7 @@ contract BQuery is Ownable {
         uint256 vaultYTokenBalance;
         uint256 assetTotalSwapAmount;
         uint256 yTokenAmountForSwapYT;
+        uint256 totalRedeemingBalance;
         bool settled;
     }
     struct BVault {
@@ -164,7 +165,13 @@ contract BQuery is Ownable {
             user
         );
     }
-    
+
+    function _vaultClosed(address vault) internal view returns (bool closed) {
+        try MIVault(vault).closed() returns (bool _closed) {
+            closed = _closed;
+        } catch {}
+    }
+
     function _queryBVault(
         address vault
     ) internal view returns (BVault memory bv) {
@@ -172,7 +179,7 @@ contract BQuery is Ownable {
         address pToken = ibv.pToken();
         bv.epochCount = ibv.epochIdCount();
         bv.pTokenTotal = IPToken(pToken).totalSupply();
-        bv.lockedAssetTotal = ibv.assetBalance();
+
         bv.f2 = ibv.paramValue("f2");
         (bool successY, bytes memory data) = vault.staticcall(
             abi.encodeWithSignature("Y()")
@@ -180,11 +187,9 @@ contract BQuery is Ownable {
         if (successY) {
             bv.Y = abi.decode(data, (uint256));
         }
-
-        try ibv.closed() {
-            bv.closed = ibv.closed();
-        } catch {
-            (bv.closed, , ) = ibv.paused();
+        bv.closed = _vaultClosed(vault);
+        if (!bv.closed) {
+            bv.lockedAssetTotal = ibv.assetBalance();
         }
         if (bv.epochCount > 0) {
             bv.current = _queryBVaultEpoch(vault, bv.epochCount);
@@ -193,15 +198,17 @@ contract BQuery is Ownable {
         if (isLP[assetToken]) {
             ILP lp = ILP(assetToken);
             bv.lpLiq = bv.lockedAssetTotal;
-            unchecked {
-                (bv.lpBase, bv.lpQuote) = _liqToTokens(
-                    uint128(bv.lpLiq),
-                    CrocQuery(crocquery).queryPrice(
-                        lp.baseToken(),
-                        lp.quoteToken(),
-                        lp.poolType()
-                    )
-                );
+            if (bv.lpLiq > 0) {
+                unchecked {
+                    (bv.lpBase, bv.lpQuote) = _liqToTokens(
+                        uint128(bv.lpLiq),
+                        CrocQuery(crocquery).queryPrice(
+                            lp.baseToken(),
+                            lp.quoteToken(),
+                            lp.poolType()
+                        )
+                    );
+                }
             }
         }
     }
@@ -219,12 +226,16 @@ contract BQuery is Ownable {
         bve.yTokenTotal = ibv.yTokenTotalSupply(epochId);
         bve.vaultYTokenBalance = ibv.yTokenUserBalance(epochId, vault);
         bve.assetTotalSwapAmount = ibv.assetTotalSwapAmount(epochId);
+        bve.settled = IRedeemPool(epoch.redeemPool).settled();
+        if (!bve.settled) {
+            bve.totalRedeemingBalance = IRedeemPool(epoch.redeemPool)
+                .totalRedeemingBalance();
+        }
         if (bve.yTokenTotal > bve.vaultYTokenBalance) {
             bve.yTokenAmountForSwapYT =
                 bve.yTokenTotal -
                 bve.vaultYTokenBalance;
         }
-        bve.settled = IRedeemPool(epoch.redeemPool).settled();
     }
 
     function _liqToTokens(
