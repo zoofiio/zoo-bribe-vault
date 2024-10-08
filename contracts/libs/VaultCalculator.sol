@@ -68,15 +68,12 @@ library VaultCalculator {
     uint256 APRi = self.paramValue("APRi");
 
     uint256 X = S;
-    // console.log("calcInitSwapParams, X: %s", X);
 
     // Y0 = X * APRi * D / 86400 / 365
     uint256 Y0 = X.mulDiv(APRi.mul(D), 86400 * 365);   // scale: 10 ** 10
-    // console.log("calcInitSwapParams, Y0: %s", Y0);
 
     // k0 = X * Y0
     uint256 k0 = X.mulDiv(Y0, 10 ** Constants.PROTOCOL_DECIMALS);   // scale: 1
-    // console.log("calcInitSwapParams, k0: %s", k0);
 
     return (X, k0);
   }
@@ -88,11 +85,9 @@ library VaultCalculator {
     uint256 X = self.epochNextSwapX(epochId);
     uint256 k0 = self.epochNextSwapK0(epochId);
     uint256 X_updated = X.add(m);
-    // console.log("updateSwapParamsOnDeposit, X: %s, k0: %s, X_updated: %s", X, k0, X_updated);
 
     // k'0 = ((X + m) / X)^2 * k0 = (X + m) * (X + m) * k0 / X / X = X' * X' * k0 / X / X
     uint256 k0_updated = X_updated.mulDiv(X_updated, X).mulDiv(k0, X);  // scale: 1
-    // console.log("updateSwapParamsOnDeposit, k0_updated: %s", k0_updated); 
 
     return (X_updated, k0_updated);
   }
@@ -115,8 +110,6 @@ library VaultCalculator {
       (X, k0) = calcInitSwapParams(self, S);
     }
 
-    // console.log("doCalcSwap, X: %s, k0: %s, deltaT: %s", X, k0, deltaT);
-
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
 
     uint256 decayPeriod = self.paramValue("D").div(30);
@@ -124,24 +117,18 @@ library VaultCalculator {
     T.T1 = SCALE.add(
       deltaT.mulDiv(SCALE, decayPeriod)
     );  // scale: 18
-    // console.log("doCalcSwap, n:%s, T1: %s", n, T.T1);
 
     // X * n * (1 + ∆t / 86400)2
     T.T2 = X.mulDiv(n.mulDiv(T.T1 * T.T1, SCALE), SCALE);   // scale: 1
-    // console.log("doCalcSwap, T2: %s", T.T2);
 
     // k0 + X * n * (1 + ∆t / 86400)2
     T.T3 = k0.add(T.T2);
-    // console.log("doCalcSwap, T.T3: %s", T.T3);
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
     uint256 X_updated = X.mulDiv(k0, T.T3);
-    // console.log("doCalcSwap, X_updated: %s", X_updated);
 
     // m = X - X'
     uint256 m = X.sub(X_updated);
-
-    // console.log("doCalcSwap, m: %s", m);
 
     return (X_updated, m);
   }

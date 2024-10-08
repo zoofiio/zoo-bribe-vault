@@ -113,6 +113,13 @@ describe("Ownable", () => {
     // await expect(dummyVault.connect(Bob).updateStakingPool(Bob.address)).to.be.revertedWith("Ownable: caller is not the owner");
     // await expect(dummyVault.connect(Alice).updateStakingPool(Alice.address)).not.to.be.reverted;
 
+    // Only admin could update vault's redeem pool factory
+    const defaultRedeemPoolFactory = await dummyVault.redeemPoolFactory();
+    await expect(dummyVault.connect(Bob).updateRedeemPoolFactory(Bob.address)).to.be.revertedWith("Ownable: caller is not the owner");
+    await expect(dummyVault.connect(Alice).updateRedeemPoolFactory(Alice.address)).not.to.be.reverted;
+    expect(await dummyVault.redeemPoolFactory()).to.equal(Alice.address, "Redeem pool factory is updated");
+    await expect(dummyVault.connect(Alice).updateRedeemPoolFactory(defaultRedeemPoolFactory)).not.to.be.reverted;
+
     // Only admin could pause a Vault
     await expect(dummyVault.connect(Bob).pause()).to.be.revertedWith("Ownable: caller is not the owner");
     await expect(dummyVault.connect(Alice).pause())

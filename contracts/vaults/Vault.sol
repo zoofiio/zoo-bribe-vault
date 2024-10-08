@@ -380,7 +380,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   }
 
   function _onEndEpoch(uint256 epochId) internal {
-    // console.log("_onEndEpoch, end epoch %s", epochId);
     Constants.Epoch memory epoch = _epochs[epochId];
 
     IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
@@ -434,7 +433,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
         break;
       }
     }
-    // console.log("StakingPool reward tokens count: %s", rewardTokensCount);
 
     address[] memory rewardTokens = new address[](rewardTokensCount);
     for (uint256 i = 0; i < rewardTokens.length; i++) {
@@ -460,7 +458,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       uint256 bribesAdded = newBribeTokenBalance - previousBribeTokenBalance[i];
       epochBribeTotalAmount[bribeToken] = epochBribeTotalAmount[bribeToken] + bribesAdded;
       emit BribesAdded(epochId, bribeToken, bribesAdded, address(stakingPool));
-      // console.log("epoch: %s, bribeToken: %s, total bribe amount: %s", epochId, bribeToken, epochBribeTotalAmount[bribeToken]);
     }
   }
 
@@ -492,7 +489,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   }
 
   modifier validEpochId(uint256 epochId) {
-    // console.log("validEpochId, epochId: %s, currentEpochId: %s, _epochs[epochId].startTime: %s", epochId, _currentEpochId.current(), _epochs[epochId].startTime);
     require(
       epochId > 0 && epochId <= _currentEpochId.current() && _epochs[epochId].startTime > 0,
       "Invalid epoch id"
