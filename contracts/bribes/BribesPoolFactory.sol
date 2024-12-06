@@ -3,8 +3,8 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-import "./AutoBribesPool.sol";
-import "./ManualBribesPool.sol";
+import "./StakingBribesPool.sol";
+import "./AdhocBribesPool.sol";
 import "../interfaces/IBribesPoolFactory.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
@@ -15,16 +15,16 @@ contract BribesPoolFactory is IBribesPoolFactory, ReentrancyGuard, ProtocolOwner
     address _protocol
   ) ProtocolOwner(_protocol) { }
 
-  function createAutoBribesPool(
+  function createStakingBribesPool(
     address _vault
   ) external nonReentrant onlyVault returns (address) {
-    return address(new AutoBribesPool(_vault));
+    return address(new StakingBribesPool(_vault));
   }
 
-  function createManualBribesPool(
+  function createAdhocBribesPool(
     address _vault
   ) external nonReentrant onlyVault returns (address) {
-    return address(new ManualBribesPool(_vault));
+    return address(new AdhocBribesPool(_vault));
   }
 
   modifier onlyVault() virtual {

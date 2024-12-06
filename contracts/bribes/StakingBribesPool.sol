@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import "../libs/TokensTransfer.sol";
 
-contract AutoBribesPool is Context, ReentrancyGuard {
+contract StakingBribesPool is Context, ReentrancyGuard {
   using Math for uint256;
   using EnumerableSet for EnumerableSet.AddressSet;
 
