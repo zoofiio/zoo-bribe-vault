@@ -14,6 +14,8 @@ library Constants {
     uint256 startTime;
     uint256 duration;
     address redeemPool;
+    address autoBribesPool;
+    address manualBribesPool;
   }
 
   struct BribeInfo {

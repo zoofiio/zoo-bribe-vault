@@ -40,7 +40,7 @@ contract MockVault is IVault {
   }
 
   function epochInfoById(uint256) public pure returns (Constants.Epoch memory) {
-    return Constants.Epoch(0, 0, 0, address(0));
+    return Constants.Epoch(0, 0, 0, address(0), address(0), address(0));
   }
 
   function assetToken() public view override returns (address) {

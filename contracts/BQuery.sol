@@ -116,14 +116,6 @@ contract BQuery is Ownable {
         return _queryBVaultEpoch(vault, epochId);
     }
 
-    function queryBVaultEpochUser(
-        address vault,
-        uint256 epochId,
-        address user
-    ) external view returns (BVaultEpochUser memory bveu) {
-        return _queryBVaultEpochUser(vault, epochId, user);
-    }
-
     function liqToTokens(
         uint128 liq,
         uint128 price
@@ -132,39 +124,6 @@ contract BQuery is Ownable {
     }
 
     // ====================internal====================
-    function _queryBVaultEpochUser(
-        address vault,
-        uint256 epochId,
-        address user
-    ) internal view returns (BVaultEpochUser memory bveu) {
-        MIVault ibv = MIVault(vault);
-        bveu.epochId = epochId;
-        Constants.BribeInfo[] memory bis = ibv.calcBribes(epochId, user);
-        bveu.bribes = new BribeInfo[](bis.length);
-        unchecked {
-            for (uint i = 0; i < bis.length; i++) {
-                bveu.bribes[i].epochId = bis[i].epochId;
-                bveu.bribes[i].bribeToken = bis[i].bribeToken;
-                bveu.bribes[i].bribeAmount = bis[i].bribeAmount;
-                bveu.bribes[i].bribeSymbol = ERC20(bis[i].bribeToken).symbol();
-                bveu.bribes[i].bribeTotalAmount = ibv.bribeTotalAmount(
-                    epochId,
-                    bis[i].bribeToken
-                );
-            }
-        }
-        IRedeemPool irp = IRedeemPool(ibv.epochInfoById(epochId).redeemPool);
-        if (!irp.settled()) {
-            bveu.redeemingBalance = irp.userRedeemingBalance(user);
-        } else {
-            bveu.claimableAssetBalance = irp.earnedAssetAmount(user);
-        }
-        bveu.userBalanceYToken = ibv.yTokenUserBalance(epochId, user);
-        bveu.userBalanceYTokenSyntyetic = ibv.yTokenUserBalanceSynthetic(
-            epochId,
-            user
-        );
-    }
 
     function _vaultClosed(address vault) internal view returns (bool closed) {
         try MIVault(vault).closed() returns (bool _closed) {

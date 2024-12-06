@@ -133,30 +133,4 @@ library VaultCalculator {
     return (X_updated, m);
   }
 
-  function doCalcBribes(IVault self, uint256 epochId, address account) public view returns (Constants.BribeInfo[] memory) {  
-    // Constants.Epoch memory epoch = self.epochInfoById(epochId);
-    // uint256 epochEndTime = epoch.startTime.add(epoch.duration);
-    // require(block.timestamp > epochEndTime, "Epoch not ended yet");
-
-    uint256 yTokenBalanceSynthetic = self.yTokenUserBalanceSynthetic(epochId, account);
-    uint256 yTokenTotalSupplySynthetic = self.yTokenTotalSupplySynthetic(epochId);
-    require(yTokenTotalSupplySynthetic >= yTokenBalanceSynthetic, "Invalid yToken balance");
-
-    address[] memory epochBribeTokens = self.bribeTokens(epochId);
-    Constants.BribeInfo[] memory bribeInfo = new Constants.BribeInfo[](epochBribeTokens.length);
-    for (uint256 i = 0; i < epochBribeTokens.length; i++) {
-      address bribeToken = epochBribeTokens[i];
-      uint256 totalRewards = self.bribeTotalAmount(epochId, bribeToken);
-      uint256 bribes = 0;
-      if (totalRewards != 0 && yTokenBalanceSynthetic != 0) {
-        bribes = totalRewards.mulDiv(yTokenBalanceSynthetic, yTokenTotalSupplySynthetic);
-      }
-      bribeInfo[i].epochId = epochId;
-      bribeInfo[i].bribeToken = bribeToken;
-      bribeInfo[i].bribeAmount = bribes;
-    }
-
-    return bribeInfo;
-  }
-
 }

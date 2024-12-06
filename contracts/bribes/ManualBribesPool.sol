@@ -47,7 +47,7 @@ contract ManualBribesPool is Context, ReentrancyGuard {
     return _balances[user];
   }
 
-  function earned(address user, address bribeToken) public view onlyValidBribeToken(bribeToken) returns (uint256) {
+  function earned(address user, address bribeToken) public view returns (uint256) {
     return _balances[user].mulDiv(
       bribesPerTimeWeightedYT[bribeToken] - userBribesPerTimeWeightedYTPaid[user][bribeToken],
       1e18
@@ -109,18 +109,14 @@ contract ManualBribesPool is Context, ReentrancyGuard {
     emit TimeWeightedYTAdded(user, deltaTimeWeightedYTAmount);
   }
 
-  function addBribeTokenIfNotExist(address bribeToken) external nonReentrant onlyVault {
-    require(bribeToken != address(0), "Zero address detected");
+  function addBribes(address bribeToken, uint256 bribesAmount) external nonReentrant onlyVault updateBribes(address(0), bribeToken) {
+    require(_totalSupply > 0, "Cannot add bribes without YT staked");
+    require(bribesAmount > 0, "Too small bribes amount");
 
     if (!_bribeTokens.contains(bribeToken)) {
       _bribeTokens.add(bribeToken);
       emit BribeTokenAdded(bribeToken);
     }
-  }
-
-  function addBribes(address bribeToken, uint256 bribesAmount) external nonReentrant onlyVault onlyValidBribeToken(bribeToken) updateBribes(address(0), bribeToken) {
-    require(_totalSupply > 0, "Cannot add bribes without YT staked");
-    require(bribesAmount > 0, "Too small bribes amount");
 
     TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), bribesAmount);
 
@@ -133,11 +129,6 @@ contract ManualBribesPool is Context, ReentrancyGuard {
 
   modifier onlyVault() {
     require(_msgSender() == vault, "Caller is not Vault");
-    _;
-  }
-
-  modifier onlyValidBribeToken(address bribeToken) {
-    require(_bribeTokens.contains(bribeToken), "Bribe token not supported");
     _;
   }
 

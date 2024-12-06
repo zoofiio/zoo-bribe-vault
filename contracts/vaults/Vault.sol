@@ -13,6 +13,8 @@ import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
 import "../libs/VaultCalculator.sol";
+import "../interfaces/IBribesPool.sol";
+import "../interfaces/IBribesPoolFactory.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IRedeemPool.sol";
@@ -35,6 +37,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   address public immutable settings;
   IStakingPool public stakingPool;
   IRedeemPoolFactory public redeemPoolFactory;
+  IBribesPoolFactory public bribesPoolFactory;
 
   IERC20 internal immutable _assetToken;
   IPToken internal immutable _pToken;
@@ -47,25 +50,21 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   mapping(uint256 => uint256) internal _yTokenTotalSupply;  // including yTokens hold by Vault
   mapping(uint256 => mapping(address => uint256)) internal _yTokenUserBalances;
-  mapping(uint256 => uint256) internal _yTokenTotalSupplySynthetic;  // NOT including yTokens hold by Vault
-  mapping(uint256 => mapping(address => uint256)) internal _yTokenUserBalancesSynthetic;
 
   mapping(uint256 => uint256) internal _epochNextSwapX;
   mapping(uint256 => uint256) internal _epochNextSwapK0;
-
-  mapping(uint256 => EnumerableSet.AddressSet) internal _bribeTokens;  // epoch id => bribe tokens set
-  mapping(uint256 => mapping(address => uint256)) internal _bribeTotalAmount;  // epoch id => (bribe token => total amount)
 
   constructor(
     address _protocol,
     address _settings,
     address _redeemPoolFactory,
+    address _bribesPoolFactory,
     address _stakingPool_,
     address _assetToken_,
     string memory _pTokenName, string memory _pTokensymbol
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _redeemPoolFactory != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
+      _settings != address(0) && _redeemPoolFactory != address(0) && _bribesPoolFactory != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN);
@@ -73,6 +72,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
     settings = _settings;
     redeemPoolFactory = IRedeemPoolFactory(_redeemPoolFactory);
+    bribesPoolFactory = IBribesPoolFactory(_bribesPoolFactory);
     stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
@@ -127,27 +127,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   function yTokenUserBalance(uint256 epochId, address user) public view validEpochId(epochId) returns (uint256) {
     return _yTokenUserBalances[epochId][user];
-  }
-
-  function yTokenTotalSupplySynthetic(uint256 epochId) public view validEpochId(epochId) returns (uint256) {
-    return _yTokenTotalSupplySynthetic[epochId];
-  }
-
-  function yTokenUserBalanceSynthetic(uint256 epochId, address user) public view validEpochId(epochId) returns (uint256) {
-    require(user != address(this));
-    return _yTokenUserBalancesSynthetic[epochId][user];
-  }
-
-  function calcBribes(uint256 epochId, address account) public view validEpochId(epochId) returns (Constants.BribeInfo[] memory) {
-    return IVault(this).doCalcBribes(epochId, account);
-  }
-
-  function bribeTokens(uint256 epochId) public view validEpochId(epochId) returns (address[] memory) {
-    return _bribeTokens[epochId].values();
-  }
-
-  function bribeTotalAmount(uint256 epochId, address bribeToken) public view validEpochId(epochId) returns (uint256) {
-    return _bribeTotalAmount[epochId][bribeToken];
   }
 
   function paramValue(bytes32 param) public view override returns (uint256) {
@@ -242,38 +221,14 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     uint256 yTokenAmount = m;
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yTokens");
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)] - yTokenAmount;
-    _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()] + yTokenAmount;
+    
+    IBribesPool autoBribesPool = IBribesPool(_epochs[_currentEpochId.current()].autoBribesPool);
+    autoBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
 
-    uint256 yTokenAmountSynthetic = yTokenAmount * (epoch.startTime + epoch.duration - block.timestamp);
-    _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] = _yTokenUserBalancesSynthetic[_currentEpochId.current()][_msgSender()] + yTokenAmountSynthetic;
-    _yTokenTotalSupplySynthetic[_currentEpochId.current()] = _yTokenTotalSupplySynthetic[_currentEpochId.current()] + yTokenAmountSynthetic;
+    IBribesPool manualBribesPool = IBribesPool(_epochs[_currentEpochId.current()].manualBribesPool);
+    manualBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
 
     emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
-  }
-
-  function claimBribes(uint256 epochId) external nonReentrant whenNotPaused validEpochId(epochId) {
-    Constants.Epoch memory epoch = epochInfoById(epochId);
-    uint256 epochEndTime = epoch.startTime + epoch.duration;
-    require(block.timestamp > epochEndTime, "Epoch not ended yet");
-
-    uint256 yTokenBalanceSynthetic = _yTokenUserBalancesSynthetic[epochId][_msgSender()];
-    require(yTokenBalanceSynthetic > 0);
-    uint256 yTokenTotalSynthetic = _yTokenTotalSupplySynthetic[epochId];
-    require(yTokenTotalSynthetic >= yTokenBalanceSynthetic);
-
-    Constants.BribeInfo[] memory bribeInfo = calcBribes(epochId, _msgSender());
-    for (uint256 i = 0; i < bribeInfo.length; i++) {
-      Constants.BribeInfo memory info = bribeInfo[i];
-      if (info.bribeAmount > 0) {
-        _bribeTotalAmount[info.epochId][info.bribeToken] = _bribeTotalAmount[info.epochId][info.bribeToken] - info.bribeAmount;
-        TokensTransfer.transferTokens(info.bribeToken, address(this), _msgSender(), info.bribeAmount);
-        emit BribesClaimed(info.bribeToken, _msgSender(), info.bribeAmount);
-      }
-    }
-
-    _yTokenUserBalancesSynthetic[epochId][_msgSender()] = 0;
-    _yTokenTotalSupplySynthetic[epochId] = yTokenTotalSynthetic - yTokenBalanceSynthetic;
-    emit YTokenDummyBurned(epochId, _msgSender(), yTokenBalanceSynthetic);
   }
 
   function batchClaimRedeemAssets(uint256[] memory epochIds) external nonReentrant {
@@ -296,7 +251,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
         currentEpoch.duration = block.timestamp - currentEpoch.startTime;
       }
       _onEndEpoch(_currentEpochId.current());
-      _updateBribes();
+      _updateAutoBribes();
     }
 
     // withdraw all assets from staking pool
@@ -331,30 +286,25 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     redeemPoolFactory = IRedeemPoolFactory(newRedeemPoolFactory);
   }
 
+  function updateBribesPoolFactory(address newBribesPoolFactory) external nonReentrant onlyOwner {
+    bribesPoolFactory = IBribesPoolFactory(newBribesPoolFactory);
+  }
+
   function setBriber(address account, bool briber) external nonReentrant onlyOwner {
     _setBriber(account, briber);
   }
 
-  function addBribeToken(address bribeToken) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) {
+
+  function addManualBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) noneZeroAmount(amount) {
     // current epoch may be ended
     uint256 epochId = _currentEpochId.current();
     require(epochId > 0);
-    EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
-    bool added = epochBribeTokens.add(bribeToken);
-    if (added) {
-      emit BribeTokenAdded(epochId, bribeToken, _msgSender());
-    }
-  }
 
-  function addBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) noneZeroAmount(amount) {
-    // current epoch may be ended
-    uint256 epochId = _currentEpochId.current();
-    require(epochId > 0);
-    require(_bribeTokens[epochId].contains(bribeToken));
-
+    IBribesPool manualBribesPool = IBribesPool(_epochs[_currentEpochId.current()].manualBribesPool);
     TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), amount);
-    _bribeTotalAmount[epochId][bribeToken] = _bribeTotalAmount[epochId][bribeToken] + amount;
-    emit BribesAdded(epochId, bribeToken, amount, _msgSender());
+
+    IERC20(bribeToken).approve(address(manualBribesPool), amount);
+    manualBribesPool.addBribes(bribeToken, amount);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
@@ -374,7 +324,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
         newEpoch = true;
       }
     }
-    _updateBribes();
+    _updateAutoBribes();
 
     return newEpoch;
   }
@@ -405,8 +355,10 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _epochs[epochId].startTime = block.timestamp;
     _epochs[epochId].duration = paramValue("D");
     _epochs[epochId].redeemPool = redeemPoolFactory.createRedeemPool(address(this));
+    _epochs[epochId].autoBribesPool = bribesPoolFactory.createAutoBribesPool(address(this));
+    _epochs[epochId].manualBribesPool = bribesPoolFactory.createManualBribesPool(address(this));
 
-    emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool);
+    emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool, _epochs[epochId].autoBribesPool, _epochs[epochId].manualBribesPool);
 
     if (oldEpochId > 0) {
       uint256 yTokenAmount = IERC20(_pToken).totalSupply();
@@ -421,9 +373,14 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _epochNextSwapK0[_currentEpochId.current()] = k0;
   }
 
-  function _updateBribes() internal {
+  function _updateAutoBribes() internal {
     uint256 epochId = _currentEpochId.current();
-    EnumerableSet.AddressSet storage epochBribeTokens = _bribeTokens[epochId];
+
+    IBribesPool autoBribesPool = IBribesPool(_epochs[epochId].autoBribesPool);
+    // Keep bribes unclaimed, if nobody swapped for YT yet in this epoch
+    if (autoBribesPool.totalSupply() == 0) {
+      return;
+    }
 
     uint256 rewardTokensCount = 0;
     while(true) {
@@ -439,25 +396,17 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       rewardTokens[i] = stakingPool.rewardTokens(i);
     }
 
-    uint256[] memory previousBribeTokenBalance = new uint256[](rewardTokens.length);
-    for (uint256 i = 0; i < rewardTokens.length; i++) {
-      address bribeToken = rewardTokens[i];
-      bool added = epochBribeTokens.add(bribeToken);
-      if (added) {
-        emit BribeTokenAdded(epochId, bribeToken, address(stakingPool));
-      }
-      previousBribeTokenBalance[i] = IERC20(bribeToken).balanceOf(address(this));
-    }
-
     stakingPool.getReward();
 
-    mapping(address => uint256) storage epochBribeTotalAmount = _bribeTotalAmount[epochId];
     for (uint256 i = 0; i < rewardTokens.length; i++) {
       address bribeToken = rewardTokens[i];
-      uint256 newBribeTokenBalance = IERC20(bribeToken).balanceOf(address(this));
-      uint256 bribesAdded = newBribeTokenBalance - previousBribeTokenBalance[i];
-      epochBribeTotalAmount[bribeToken] = epochBribeTotalAmount[bribeToken] + bribesAdded;
-      emit BribesAdded(epochId, bribeToken, bribesAdded, address(stakingPool));
+      uint256 allBribes = IERC20(bribeToken).balanceOf(address(this));
+
+      // Add bribes to auto bribes pool
+      if (allBribes > 0) {
+        IERC20(bribeToken).approve(address(autoBribesPool), allBribes);
+        autoBribesPool.addBribes(bribeToken, allBribes);
+      }
     }
   }
 
@@ -500,18 +449,13 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
 
   event Closed();
 
-  event EpochStarted(uint256 epochId, uint256 startTime, uint256 duration, address redeemPool);
+  event EpochStarted(uint256 epochId, uint256 startTime, uint256 duration, address redeemPool, address autoBribesPool, address manualBribesPool);
 
   event PTokenMinted(address indexed user, uint256 assetTokenAmount, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event PTokenBurned(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
   event YTokenDummyMinted(uint256 indexed epochId, address indexed user, uint256 assetTokenAmount, uint256 yTokenAmount);
-  event YTokenDummyBurned(uint256 indexed epochId, address indexed user, uint256 yTokenAmount);
 
   event Deposit(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 pTokenAmount, uint256 yTokenAmount);
   event Swap(uint256 indexed epochId, address indexed user, uint256 assetAmount, uint256 fees, uint256 pTokenAmount, uint256 yTokenAmount);
-  event BribesClaimed(address indexed bribeToken, address indexed user, uint256 amount);
   event Redeem(address indexed user, uint256 pTokenAmount, uint256 pTokenSharesAmount);
-
-  event BribeTokenAdded(uint256 indexed epochId, address indexed bribeToken, address source);
-  event BribesAdded(uint256 indexed epochId, address indexed bribeToken, uint256 amount, address source);
 }
