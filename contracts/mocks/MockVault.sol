@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
+import "../interfaces/IBribesPool.sol";
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IStakingPool.sol";
@@ -67,22 +68,6 @@ contract MockVault is IVault {
     return 0;
   }
 
-  function yTokenTotalSupplySynthetic(uint256) public pure returns (uint256) {
-    return 0;
-  }
-
-  function yTokenUserBalanceSynthetic(uint256, address) public pure returns (uint256) {
-    return 0;
-  }
-
-  function bribeTokens(uint256) public pure returns (address[] memory) {
-    return new address[](0);
-  }
-
-  function bribeTotalAmount(uint256, address) public pure returns (uint256) {
-    return 0;
-  }
-
   function epochNextSwapX(uint256) external pure returns (uint256) {
     return 0;
   }
@@ -92,6 +77,16 @@ contract MockVault is IVault {
   }
 
   /* ========== Mock Functions ========== */
+
+  function mockNotifyYTSwappedForUser(IBribesPool bribesPool, address user, uint256 yTokenAmount) external {
+    bribesPool.notifyYTSwappedForUser(user, yTokenAmount);
+  }
+
+  function mockAddBribes(IBribesPool bribesPool, address bribeToken, uint256 bribesAmount) external {
+    TokensTransfer.transferTokens(bribeToken, msg.sender, address(this), bribesAmount);
+    IERC20(bribeToken).approve(address(bribesPool), bribesAmount);
+    bribesPool.addBribes(bribeToken, bribesAmount);
+  }
 
   function mockSwap(uint256 amount) external {
     TokensTransfer.transferTokens(address(_assetToken), msg.sender, address(this), amount);

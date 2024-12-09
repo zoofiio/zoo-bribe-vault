@@ -12,6 +12,7 @@ import {
   VaultCalculator__factory,
   MockStakingPool__factory,
   RedeemPoolFactory__factory,
+  BribesPoolFactory__factory,
   Vault,
 } from "../typechain";
 
@@ -41,6 +42,10 @@ export async function deployContractsFixture() {
   const RedeemPoolFactoryFactory = await ethers.getContractFactory("RedeemPoolFactory");
   const RedeemPoolFactory = await RedeemPoolFactoryFactory.deploy(await protocol.getAddress());
   const redeemPoolFactory = RedeemPoolFactory__factory.connect(await RedeemPoolFactory.getAddress(), provider);
+
+  const BribesPoolFactoryFactory = await ethers.getContractFactory("BribesPoolFactory");
+  const BribesPoolFactory = await BribesPoolFactoryFactory.deploy(await protocol.getAddress());
+  const bribesPoolFactory = BribesPoolFactory__factory.connect(await BribesPoolFactory.getAddress(), provider);
   
   const MockERC20Factory = await ethers.getContractFactory("MockERC20");
   // const MockERC20 = await MockERC20Factory.deploy("ERC20 Mock", "MockERC20");
@@ -73,6 +78,7 @@ export async function deployContractsFixture() {
   const iBGTVaultContract = await VaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(), 
     await redeemPoolFactory.getAddress(),
+    await bribesPoolFactory.getAddress(),
     await stakingPool.getAddress(),
     await iBGT.getAddress(), "Zoo piBGT", "piBGT"
   );
@@ -86,6 +92,7 @@ export async function deployContractsFixture() {
   const iBGT8VaultContract = await VaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(),
     await redeemPoolFactory.getAddress(),
+    await bribesPoolFactory.getAddress(),
     await stakingPool8.getAddress(),
     await iBGT8.getAddress(), "Zoo piBGT8", "piBGT8"
   );
@@ -95,7 +102,7 @@ export async function deployContractsFixture() {
 
   return { 
     Alice, Bob, Caro, Dave,
-    protocol, settings, redeemPoolFactory, stakingPool, stakingPool8,
+    protocol, settings, redeemPoolFactory, bribesPoolFactory, stakingPool, stakingPool8,
     iBGT, iBGT8, stETH, vaultCalculator, vault, vault8
   };
 }

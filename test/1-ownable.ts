@@ -47,7 +47,7 @@ describe("Ownable", () => {
 
   it("Privileged operations", async () => {
     const {
-      Alice, Bob, protocol, settings, redeemPoolFactory, vault, stakingPool, vaultCalculator
+      Alice, Bob, protocol, settings, redeemPoolFactory, bribesPoolFactory, vault, stakingPool, vaultCalculator
     } = await loadFixture(deployContractsFixture);
     const piBGT = PToken__factory.connect(await vault.pToken(), provider);
 
@@ -65,7 +65,7 @@ describe("Ownable", () => {
       }
     });
     const DmyVaultContract = await VaultFactory.deploy(
-      await protocol.getAddress(), await settings.getAddress(), await redeemPoolFactory.getAddress(), await stakingPool.getAddress(),
+      await protocol.getAddress(), await settings.getAddress(), await redeemPoolFactory.getAddress(), await bribesPoolFactory.getAddress(), await stakingPool.getAddress(),
       await dummyToken.getAddress(), "Zoo pDmy", "pDmy"
     );
     const dummyVault = Vault__factory.connect(await DmyVaultContract.getAddress(), provider);
