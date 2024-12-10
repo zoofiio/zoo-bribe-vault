@@ -13,11 +13,10 @@ describe('StakingBribesPool', () => {
 
   let mockVault: MockVault;
   let bribesPool: StakingBribesPool;
-  // let piBGT: PToken;
   let iBGT8Token: MockERC20;
 
   beforeEach(async () => {
-    const { protocol, settings, stakingPool, iBGT, iBGT8, Alice, Bob } = await loadFixture(deployContractsFixture);
+    const { protocol, settings, stakingPool, iBGT, iBGT8, Alice } = await loadFixture(deployContractsFixture);
     iBGT8Token = iBGT8;
 
     const MockVaultFactory = await ethers.getContractFactory("MockVault");
@@ -26,7 +25,6 @@ describe('StakingBribesPool', () => {
       await iBGT.getAddress(), "Zoo piBGT", "piBGT"
     );
     mockVault = MockVault__factory.connect(await MockVault.getAddress(), ethers.provider);
-    // piBGT = PToken__factory.connect(await mockVault.pToken(), ethers.provider);
 
     let trans = await protocol.connect(Alice).addVault(await mockVault.getAddress());
     await trans.wait();
@@ -61,9 +59,9 @@ describe('StakingBribesPool', () => {
     let caroYTAmount = ethers.parseUnits('200');
     await expect(bribesPool.connect(Alice).notifyYTSwappedForUser(Bob.address, bobYTAmount)).to.be.revertedWith("Caller is not Vault");
     let trans = await mockVault.connect(Alice).mockNotifyYTSwappedForUser(await bribesPool.getAddress(), Bob.address, bobYTAmount);
-    await expect(trans).to.emit(bribesPool, "YTAdded").withArgs(Bob.address, bobYTAmount);
+    await expect(trans).to.emit(bribesPool, "YTSwapped").withArgs(Bob.address, bobYTAmount);
     trans = await mockVault.connect(Alice).mockNotifyYTSwappedForUser(await bribesPool.getAddress(), Caro.address, caroYTAmount);
-    await expect(trans).to.emit(bribesPool, "YTAdded").withArgs(Caro.address, caroYTAmount);
+    await expect(trans).to.emit(bribesPool, "YTSwapped").withArgs(Caro.address, caroYTAmount);
     expect(await bribesPool.balanceOf(Bob.address)).to.equal(bobYTAmount);
     expect(await bribesPool.balanceOf(Caro.address)).to.equal(caroYTAmount);
     expect(await bribesPool.totalSupply()).to.equal(bobYTAmount + caroYTAmount);
@@ -104,7 +102,7 @@ describe('StakingBribesPool', () => {
     let caroYTAmount2 = ethers.parseUnits('200');
     caroYTAmount = caroYTAmount + caroYTAmount2;  // 400
     trans = await mockVault.connect(Alice).mockNotifyYTSwappedForUser(await bribesPool.getAddress(), Caro.address, caroYTAmount2);
-    await expect(trans).to.emit(bribesPool, "YTAdded").withArgs(Caro.address, caroYTAmount2);
+    await expect(trans).to.emit(bribesPool, "YTSwapped").withArgs(Caro.address, caroYTAmount2);
     expect(await bribesPool.balanceOf(Bob.address)).to.equal(bobYTAmount);
     expect(await bribesPool.balanceOf(Caro.address)).to.equal(caroYTAmount);
     expect(await bribesPool.totalSupply()).to.equal(bobYTAmount + caroYTAmount);
@@ -176,7 +174,7 @@ describe('StakingBribesPool', () => {
     let bobYTAmount2 = ethers.parseUnits('400');
     bobYTAmount = ethers.parseUnits('1200');
     trans = await mockVault.connect(Alice).mockNotifyYTSwappedForUser(await bribesPool.getAddress(), Bob.address, bobYTAmount2);
-    await expect(trans).to.emit(bribesPool, "YTAdded").withArgs(Bob.address, bobYTAmount2);
+    await expect(trans).to.emit(bribesPool, "YTSwapped").withArgs(Bob.address, bobYTAmount2);
     expect(await bribesPool.balanceOf(Bob.address)).to.equal(bobYTAmount); // 1200
     expect(await bribesPool.balanceOf(Caro.address)).to.equal(caroYTAmount);  // 400
     expect(await bribesPool.totalSupply()).to.equal(bobYTAmount + caroYTAmount);  // 1600

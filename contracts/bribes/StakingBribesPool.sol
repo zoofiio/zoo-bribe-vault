@@ -79,7 +79,7 @@ contract StakingBribesPool is Context, ReentrancyGuard {
     _totalSupply = _totalSupply + deltaYTAmount;
     _balances[user] = _balances[user] + deltaYTAmount;
 
-    emit YTAdded(user, deltaYTAmount);
+    emit YTSwapped(user, deltaYTAmount);
   }
 
   function addBribes(address bribeToken, uint256 bribesAmount) external nonReentrant onlyVault updateBribes(address(0), bribeToken) {
@@ -131,7 +131,7 @@ contract StakingBribesPool is Context, ReentrancyGuard {
 
   event BribeTokenAdded(address indexed bribeToken);
 
-  event YTAdded(address indexed user, uint256 deltaYTAmount);
+  event YTSwapped(address indexed user, uint256 deltaYTAmount);
 
   event BribesAdded(address indexed bribeToken, uint256 bribes);
 

@@ -22,9 +22,9 @@ contract BribesPoolFactory is IBribesPoolFactory, ReentrancyGuard, ProtocolOwner
   }
 
   function createAdhocBribesPool(
-    address _vault
+    address _vault, uint256 _epochEndTimestamp
   ) external nonReentrant onlyVault returns (address) {
-    return address(new AdhocBribesPool(_vault));
+    return address(new AdhocBribesPool(_vault, _epochEndTimestamp));
   }
 
   modifier onlyVault() virtual {

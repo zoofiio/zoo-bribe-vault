@@ -356,7 +356,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _epochs[epochId].duration = paramValue("D");
     _epochs[epochId].redeemPool = redeemPoolFactory.createRedeemPool(address(this));
     _epochs[epochId].stakingBribesPool = bribesPoolFactory.createStakingBribesPool(address(this));
-    _epochs[epochId].adhocBribesPool = bribesPoolFactory.createAdhocBribesPool(address(this));
+    _epochs[epochId].adhocBribesPool = bribesPoolFactory.createAdhocBribesPool(address(this), _epochs[epochId].startTime + _epochs[epochId].duration);
 
     emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool, _epochs[epochId].stakingBribesPool, _epochs[epochId].adhocBribesPool);
 

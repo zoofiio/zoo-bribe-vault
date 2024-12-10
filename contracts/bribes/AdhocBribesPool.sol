@@ -18,11 +18,12 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
   /* ========== STATE VARIABLES ========== */
 
   address public immutable vault;
+  uint256 public immutable epochEndTimestamp;
 
   EnumerableSet.AddressSet internal _bribeTokens;
 
-  mapping(address => uint256) public userYTSum;
-  mapping(address => uint256) public userYTLastCollectTime;
+  mapping(address => uint256) public ytSum;
+  mapping(address => uint256) public ytLastCollectTime;
 
   mapping(address => uint256) public bribesPerTimeWeightedYT;  // (bribe token => bribes per Time-Weighted YT)
   mapping(address => mapping(address => uint256)) public userBribesPerTimeWeightedYTPaid; 
@@ -33,8 +34,9 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
   /* ========== CONSTRUCTOR ========== */
 
-  constructor(address _vault) {
+  constructor(address _vault, uint256 _epochEndTimestamp) {
     vault = _vault;
+    epochEndTimestamp = _epochEndTimestamp;
   }
 
   /* ========== VIEWS ========== */
@@ -47,10 +49,17 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
     return _balances[user];
   }
 
+  function collectableYT(address user) public view returns (uint256, uint256) {
+    uint256 ytCollectTimestamp = ytCollectTimestampApplicable();
+    uint256 deltaTime = ytCollectTimestamp - ytLastCollectTime[user];
+    uint256 deltaTimeWeightedYTAmount = ytSum[user] * deltaTime;
+    return (ytCollectTimestamp, deltaTimeWeightedYTAmount);
+  }
+
   function earned(address user, address bribeToken) public view returns (uint256) {
     return _balances[user].mulDiv(
       bribesPerTimeWeightedYT[bribeToken] - userBribesPerTimeWeightedYTPaid[user][bribeToken],
-      1e18
+      1e36
     ) + userBribes[user][bribeToken];
   }
 
@@ -59,16 +68,19 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
     return _bribeTokens.values();
   }
 
+  function ytCollectTimestampApplicable() public view returns (uint256) {
+    return Math.min(block.timestamp, epochEndTimestamp);
+  }
+
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function collectYT() external nonReentrant {
-    uint256 deltaTime = block.timestamp - userYTLastCollectTime[_msgSender()];
-    uint256 deltaTimeWeightedYTAmount = userYTSum[_msgSender()] * deltaTime;
+    (uint256 ytCollectTimestamp, uint256 deltaTimeWeightedYTAmount) = collectableYT(_msgSender());
     if (deltaTimeWeightedYTAmount > 0) {
       _notifyYTCollectedForUser(_msgSender(), deltaTimeWeightedYTAmount);
     }
 
-    userYTLastCollectTime[_msgSender()] = block.timestamp;
+    ytLastCollectTime[_msgSender()] = ytCollectTimestamp;
   }
 
   function getBribes() external nonReentrant updateAllBribes(_msgSender()) {
@@ -78,6 +90,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
       if (bribes > 0) {
         userBribes[_msgSender()][bribeToken] = 0;
         TokensTransfer.transferTokens(bribeToken, address(this), _msgSender(), bribes);
+        // console.log('getBribes, user: %s, token: %s, bribes: %s', _msgSender(), bribeToken, bribes);
         emit BribesPaid(_msgSender(), bribeToken, bribes);
       }
     }
@@ -90,17 +103,16 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
     emit YTSwapped(user, deltaYTAmount);
 
-    uint256 deltaTime = block.timestamp - userYTLastCollectTime[user];
-    uint256 deltaTimeWeightedYTAmount = userYTSum[user] * deltaTime;
+    (uint256 ytCollectTimestamp, uint256 deltaTimeWeightedYTAmount) = collectableYT(user);
     if (deltaTimeWeightedYTAmount > 0) {
       _notifyYTCollectedForUser(user, deltaTimeWeightedYTAmount);
     }
 
-    userYTSum[user] = userYTSum[user] + deltaYTAmount;
-    userYTLastCollectTime[user] = block.timestamp;
+    ytSum[user] = ytSum[user] + deltaYTAmount;
+    ytLastCollectTime[user] = ytCollectTimestamp;
   }
 
-  function _notifyYTCollectedForUser(address user, uint256 deltaTimeWeightedYTAmount) internal nonReentrant updateAllBribes(user) {
+  function _notifyYTCollectedForUser(address user, uint256 deltaTimeWeightedYTAmount) internal updateAllBribes(user) {
     require(user != address(0) && deltaTimeWeightedYTAmount > 0, "Invalid input");
 
     _totalSupply = _totalSupply + deltaTimeWeightedYTAmount;
@@ -120,7 +132,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
     TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), bribesAmount);
 
-    bribesPerTimeWeightedYT[bribeToken] = bribesPerTimeWeightedYT[bribeToken] + bribesAmount.mulDiv(1e18, _totalSupply);
+    bribesPerTimeWeightedYT[bribeToken] = bribesPerTimeWeightedYT[bribeToken] + bribesAmount.mulDiv(1e36, _totalSupply);
 
     emit BribesAdded(bribeToken, bribesAmount);
   }
