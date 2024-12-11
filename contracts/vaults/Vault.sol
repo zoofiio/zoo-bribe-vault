@@ -179,6 +179,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
 
     emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
+
+    _updateStakingBribes();
   }
 
   function redeem(uint256 amount) external nonReentrant whenClosed noneZeroAmount(amount) {
@@ -221,6 +223,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     uint256 yTokenAmount = m;
     require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yTokens");
     _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)] - yTokenAmount;
+    _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()] + yTokenAmount;
     
     IBribesPool stakingBribesPool = IBribesPool(_epochs[_currentEpochId.current()].stakingBribesPool);
     stakingBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
@@ -229,6 +232,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     adhocBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
 
     emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
+
+    _updateStakingBribes();
   }
 
   function batchClaimRedeemAssets(uint256[] memory epochIds) external nonReentrant {
@@ -249,6 +254,9 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
       if (block.timestamp < currentEpoch.startTime + currentEpoch.duration) {
         currentEpoch.duration = block.timestamp - currentEpoch.startTime;
+        // Update AdhocBribesPool end timestamp
+        IBribesPool adhocBribesPool = IBribesPool(currentEpoch.adhocBribesPool);
+        adhocBribesPool.updateEpochEndTimeOnVaultClose(block.timestamp);
       }
       _onEndEpoch(_currentEpochId.current());
       _updateStakingBribes();
@@ -294,13 +302,12 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     _setBriber(account, briber);
   }
 
-
   function addAdhocBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) noneZeroAmount(amount) {
     // current epoch may be ended
     uint256 epochId = _currentEpochId.current();
     require(epochId > 0);
 
-    IBribesPool adhocBribesPool = IBribesPool(_epochs[_currentEpochId.current()].adhocBribesPool);
+    IBribesPool adhocBribesPool = IBribesPool(_epochs[epochId].adhocBribesPool);
     TokensTransfer.transferTokens(bribeToken, _msgSender(), address(this), amount);
 
     IERC20(bribeToken).approve(address(adhocBribesPool), amount);
@@ -324,7 +331,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
         newEpoch = true;
       }
     }
-    _updateStakingBribes();
 
     return newEpoch;
   }
@@ -413,7 +419,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   /* ============== MODIFIERS =============== */
 
   modifier onlyOwnerOrBriber() {
-    require(_msgSender() == owner() || isBriber(_msgSender()));
+    require(_msgSender() == owner() || isBriber(_msgSender()), "Not owner or briber");
     _;
   }
 

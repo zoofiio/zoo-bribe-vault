@@ -18,7 +18,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
   /* ========== STATE VARIABLES ========== */
 
   address public immutable vault;
-  uint256 public immutable epochEndTimestamp;
+  uint256 public epochEndTimestamp;
 
   EnumerableSet.AddressSet internal _bribeTokens;
 
@@ -97,6 +97,10 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
   }
 
   /* ========== RESTRICTED FUNCTIONS ========== */
+
+  function updateEpochEndTimeOnVaultClose(uint256 newEpochEndTimestamp) external nonReentrant onlyVault {
+    epochEndTimestamp = newEpochEndTimestamp;
+  }
 
   function notifyYTSwappedForUser(address user, uint256 deltaYTAmount) external nonReentrant onlyVault {
     require(user != address(0) && deltaYTAmount > 0, "Invalid input");

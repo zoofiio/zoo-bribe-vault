@@ -9,4 +9,6 @@ interface IBribesPool {
 
   function notifyYTSwappedForUser(address user, uint256 deltaYTAmount) external;
 
+  function updateEpochEndTimeOnVaultClose(uint256 newEpochEndTimestamp) external;
+
 }

@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract, wait1Tx } from "./hutils";
-import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, MockStakingPool__factory, Vault__factory } from "../typechain";
+import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Vault__factory } from "../typechain";
 
 dotenv.config();
 
@@ -53,11 +53,12 @@ async function main() {
 
   const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
   const redeemPoolFactoryAddress = await deployContract("RedeemPoolFactory", [protocolAddress]);
+  const bribesPoolFactoryAddress = await deployContract("BribesPoolFactory", [protocolAddress]);
 
   const deployVault = async (asset: string, pool: string, name: string, index: number = 1) => {
     const vaultAddress = await deployContract(
       "Vault",
-      [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, pool, asset, `Zoo p${name}`, `p${name.slice(0, 10)}`],
+      [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, bribesPoolFactoryAddress, pool, asset, `Zoo p${name}`, `p${name.slice(0, 10)}`],
       `${name}_${index}_Vault`,
       {
         libraries: {
