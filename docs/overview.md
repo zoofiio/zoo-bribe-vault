@@ -28,10 +28,15 @@ namespace B-Vault {
   class Vault {
     +address asset
     +address pToken
-    +address redeemPool
+    +address epochRedeemPools
+    +address epochStakingBribesPools
+    +address epochAdhocBribesPools
     +deposit(amount)
     +swap(amount)
-    +claimBribes()
+    +setBriber(briber)
+    +addAdhocBribes(token, amount)
+    +pause()
+    +close()
   }
   class PToken {
     +mint(amount)
@@ -47,13 +52,34 @@ namespace B-Vault {
     +exit()
     +...()
   }
+  class StakingBribesPool {
+    +balanceOf(address)
+    +totalSupply()
+    +earned(user, bribeToken)
+    +getBribes()
+    +notifyYTSwappedForUser(user, amount)
+    +addBribes(bribeToken, amount)
+    +...()
+  }
+  class AdhocBribesPool {
+    +balanceOf(address)
+    +totalSupply()
+    +earned(user, bribeToken)
+    +collectableYT()
+    +collectYT()
+    +getBribes()
+    +notifyYTSwappedForUser(user, amount)
+    +addBribes(bribeToken, amount)
+    +...()
+  }
 }
 
 
 ZooProtocol --> ProtocolSettings
 ZooProtocol "1" --> "*" Vault
 Vault --> PToken
-Vault --> RedeemPool
 Vault --> StakingPool
-
+Vault --> RedeemPool : Each Epoch
+Vault --> StakingBribesPool : Each Epoch
+Vault --> AdhocBribesPool : Each Epoch
 ``````
