@@ -20,18 +20,15 @@ async function main() {
   console.log("nonce:", nonce);
 
   const protocolAddress = await deployContract("ZooProtocol", []);
-  const protocol = ZooProtocol__factory.connect(await protocolAddress, deployer);
+  const protocol = ZooProtocol__factory.connect(protocolAddress, deployer);
 
   const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
-  const settings = ProtocolSettings__factory.connect(await protocolSettingsAddress, deployer);
+  const settings = ProtocolSettings__factory.connect(protocolSettingsAddress, deployer);
   // add Vault to protocol
   async function addVault(vault: string) {
     const isVault = await protocol.connect(deployer).isVault(vault);
     if (!isVault) {
-      await protocol
-        .connect(deployer)
-        .addVault(vault)
-        .then((tx) => tx.wait(1));
+      await protocol.connect(deployer).addVault(vault).then(wait1Tx);
     }
   }
 

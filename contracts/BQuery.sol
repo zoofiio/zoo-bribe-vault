@@ -15,11 +15,6 @@ interface MIVault is IVault {
 
     function Y() external view returns (uint256);
 
-    function calcBribes(
-        uint256 epochId,
-        address account
-    ) external view returns (Constants.BribeInfo[] memory);
-
     function bribeTotalAmount(
         uint256 epochId,
         address bribeToken
@@ -40,6 +35,24 @@ interface ILP is IERC20 {
     function baseToken() external view returns (address);
 
     function quoteToken() external view returns (address);
+}
+
+interface BribesPool {
+    function bribeTokens() external view returns (address[] memory);
+
+    function earned(
+        address user,
+        address bribeToken
+    ) external view returns (uint256);
+
+    function balanceOf(address user) external view returns (uint256);
+
+    function totalSupply() external view returns (uint256);
+
+    // only adhocBribesPool
+    function collectableYT(
+        address user
+    ) external view returns (uint256, uint256);
 }
 
 interface CrocQuery {
@@ -76,6 +89,8 @@ contract BQuery is Ownable {
         uint256 yTokenAmountForSwapYT;
         uint256 totalRedeemingBalance;
         bool settled;
+        address stakingBribesPool;
+        address adhocBribesPool;
     }
     struct BVault {
         uint256 epochCount;
@@ -98,11 +113,13 @@ contract BQuery is Ownable {
     }
     struct BVaultEpochUser {
         uint256 epochId;
-        BribeInfo[] bribes;
+        BribeInfo[] sBribes;
+        BribeInfo[] aBribes;
         uint256 redeemingBalance;
         uint256 claimableAssetBalance;
         uint256 userBalanceYToken;
         uint256 userBalanceYTokenSyntyetic;
+        uint256 userClaimableYTokenSyntyetic;
     }
 
     function queryBVault(address vault) external view returns (BVault memory) {
@@ -123,7 +140,64 @@ contract BQuery is Ownable {
         return _liqToTokens(liq, price);
     }
 
+    function queryBVaultEpochUser(
+        address vault,
+        uint256 epochId,
+        address user
+    ) external view returns (BVaultEpochUser memory bveu) {
+        return _queryBVaultEpochUser(vault, epochId, user);
+    }
+
     // ====================internal====================
+    function _queryBVaultEpochUser(
+        address vault,
+        uint256 epochId,
+        address user
+    ) internal view returns (BVaultEpochUser memory bveu) {
+        MIVault ibv = MIVault(vault);
+        bveu.epochId = epochId;
+        Constants.Epoch memory epoch = ibv.epochInfoById(epochId);
+        BribesPool sPool = BribesPool(epoch.stakingBribesPool);
+        address[] memory sBribesToken = sPool.bribeTokens();
+        bveu.sBribes = new BribeInfo[](sBribesToken.length);
+
+        BribesPool aPool = BribesPool(epoch.adhocBribesPool);
+        address[] memory aBribesToken = aPool.bribeTokens();
+        bveu.aBribes = new BribeInfo[](aBribesToken.length);
+        unchecked {
+            for (uint i = 0; i < sBribesToken.length; i++) {
+                address bribeToken = sBribesToken[i];
+                bveu.sBribes[i].epochId = epochId;
+                bveu.sBribes[i].bribeToken = bribeToken;
+                bveu.sBribes[i].bribeAmount = sPool.earned(user, bribeToken);
+                ERC20 erc20BribeToken = ERC20(bribeToken);
+                bveu.sBribes[i].bribeSymbol = erc20BribeToken.symbol();
+                bveu.sBribes[i].bribeTotalAmount = erc20BribeToken.balanceOf(
+                    epoch.stakingBribesPool
+                );
+            }
+            for (uint i = 0; i < aBribesToken.length; i++) {
+                address bribeToken = aBribesToken[i];
+                bveu.aBribes[i].epochId = epochId;
+                bveu.aBribes[i].bribeToken = bribeToken;
+                bveu.aBribes[i].bribeAmount = aPool.earned(user, bribeToken);
+                ERC20 erc20BribeToken = ERC20(bribeToken);
+                bveu.aBribes[i].bribeSymbol = erc20BribeToken.symbol();
+                bveu.aBribes[i].bribeTotalAmount = erc20BribeToken.balanceOf(
+                    epoch.adhocBribesPool
+                );
+            }
+        }
+        IRedeemPool irp = IRedeemPool(ibv.epochInfoById(epochId).redeemPool);
+        if (!irp.settled()) {
+            bveu.redeemingBalance = irp.userRedeemingBalance(user);
+        } else {
+            bveu.claimableAssetBalance = irp.earnedAssetAmount(user);
+        }
+        bveu.userBalanceYToken = ibv.yTokenUserBalance(epochId, user);
+        bveu.userBalanceYTokenSyntyetic = aPool.balanceOf(user);
+        (, bveu.userClaimableYTokenSyntyetic) = aPool.collectableYT(user);
+    }
 
     function _vaultClosed(address vault) internal view returns (bool closed) {
         try MIVault(vault).closed() returns (bool _closed) {
@@ -185,6 +259,8 @@ contract BQuery is Ownable {
         bve.yTokenTotal = ibv.yTokenTotalSupply(epochId);
         bve.vaultYTokenBalance = ibv.yTokenUserBalance(epochId, vault);
         bve.assetTotalSwapAmount = ibv.assetTotalSwapAmount(epochId);
+        bve.stakingBribesPool = epoch.stakingBribesPool;
+        bve.adhocBribesPool = epoch.adhocBribesPool;
         bve.settled = IRedeemPool(epoch.redeemPool).settled();
         if (!bve.settled) {
             bve.totalRedeemingBalance = IRedeemPool(epoch.redeemPool)

@@ -24,20 +24,27 @@
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0"
     ]
   },
-  "BQuery": {
-    "address": "0xDf1126d3627b7f5D2a44d978A7180AcbD3c34aB6",
-    "args": []
-  },
   "VaultCalculator": {
     "address": "0xF6489bF50289bCC13A4202374d21147471b76A55",
     "args": []
   },
+  "BQuery": {
+    "address": "0xEE723BD0bC2449678d37177B7D93cc69D1af4B6F",
+    "args": []
+  },
+  "BribesPoolFactory": {
+    "address": "0x56ebBf70c519055d408B049FDBFc60aEA952dcEE",
+    "args": [
+      "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0"
+    ]
+  },
   "HONEY-WBERA-LP_1_Vault": {
-    "address": "0x5C88005534FB5C5B01445eC5bC944ebA0818554f",
+    "address": "0x77412b08bB3a8c38F7D0DC7D1158C5E7bfE03Eea",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
       "0x7846c32d372f902289A9ea889672a013B5f41D83",
+      "0x56ebBf70c519055d408B049FDBFc60aEA952dcEE",
       "0x5c5f9a838747fb83678ECe15D85005FD4F558237",
       "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7",
       "Zoo pHONEY-WBERA-LP",
@@ -45,11 +52,12 @@
     ]
   },
   "HONEY-WBERA-LP_2_Vault": {
-    "address": "0x9Ef9cE44c82111e967904059edf12701e17e6C03",
+    "address": "0xCC5AeD7b81dc45f02329Cc2Bf2c64B873D0be752",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
       "0x7846c32d372f902289A9ea889672a013B5f41D83",
+      "0x56ebBf70c519055d408B049FDBFc60aEA952dcEE",
       "0x5c5f9a838747fb83678ECe15D85005FD4F558237",
       "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7",
       "Zoo pHONEY-WBERA-LP",
