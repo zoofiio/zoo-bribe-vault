@@ -68,14 +68,14 @@ export async function deployContractsFixture() {
   const VaultCalculator = await VaultCalculatorFactory.deploy();
   const vaultCalculator = VaultCalculator__factory.connect(await VaultCalculator.getAddress(), provider);
 
-  const VaultFactory = await ethers.getContractFactory("Vault", {
+  const InfraredVaultFactory = await ethers.getContractFactory("InfraredVault", {
     libraries: {
       VaultCalculator: await vaultCalculator.getAddress(),
     }
   });
   // console.log(`Vault code size: ${VaultFactory.bytecode.length / 2} bytes. (max: ${maxContractSize} bytes)`);
 
-  const iBGTVaultContract = await VaultFactory.deploy(
+  const iBGTVaultContract = await InfraredVaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(), 
     await redeemPoolFactory.getAddress(),
     await bribesPoolFactory.getAddress(),
@@ -89,7 +89,7 @@ export async function deployContractsFixture() {
   const MockStakingPool8 = await MockStakingPoolFactory.deploy(await protocol.getAddress(), await iBGT8.getAddress());
   const stakingPool8 = MockStakingPool__factory.connect(await MockStakingPool8.getAddress(), provider);
 
-  const iBGT8VaultContract = await VaultFactory.deploy(
+  const iBGT8VaultContract = await InfraredVaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(),
     await redeemPoolFactory.getAddress(),
     await bribesPoolFactory.getAddress(),

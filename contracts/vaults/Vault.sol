@@ -19,14 +19,13 @@ import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
 import "../interfaces/IRedeemPool.sol";
 import "../interfaces/IRedeemPoolFactory.sol";
-import "../interfaces/IStakingPool.sol";
 import "../interfaces/IVault.sol";
 import "../interfaces/IZooProtocol.sol";
 import "../settings/ProtocolOwner.sol";
 import "../tokens/PToken.sol";
 import "./BriberExtension.sol";
 
-contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtension {
+abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtension {
   using Counters for Counters.Counter;
   using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using EnumerableSet for EnumerableSet.AddressSet;
@@ -35,7 +34,6 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   bool internal _closed;
 
   address public immutable settings;
-  IStakingPool public stakingPool;
   IRedeemPoolFactory public redeemPoolFactory;
   IBribesPoolFactory public bribesPoolFactory;
 
@@ -59,12 +57,11 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     address _settings,
     address _redeemPoolFactory,
     address _bribesPoolFactory,
-    address _stakingPool_,
     address _assetToken_,
     string memory _pTokenName, string memory _pTokensymbol
   ) ProtocolOwner(_protocol) {
     require(
-      _settings != address(0) && _redeemPoolFactory != address(0) && _bribesPoolFactory != address(0) && _stakingPool_ != address(0) && _assetToken_ != address(0),
+      _settings != address(0) && _redeemPoolFactory != address(0) && _bribesPoolFactory != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN);
@@ -73,13 +70,10 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     settings = _settings;
     redeemPoolFactory = IRedeemPoolFactory(_redeemPoolFactory);
     bribesPoolFactory = IBribesPoolFactory(_bribesPoolFactory);
-    stakingPool = IStakingPool(_stakingPool_);
 
     _assetToken = IERC20(_assetToken_);
     // PToken's decimals should be the same as the asset token's decimals
     _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, IERC20Metadata(_assetToken_).decimals());
-    
-    _assetToken.approve(address(stakingPool), type(uint256).max);
   }
 
   /* ================= VIEWS ================ */
@@ -89,7 +83,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   }
 
   function assetBalance() public view override whenNotClosed returns (uint256) {
-    return stakingPool.balanceOf(address(this));
+    return _balanceOfUnderlyingVault();
   }
 
   function assetToken() public view override returns (address) {
@@ -157,7 +151,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     bool newEpoch = _onUserAction(amount);
 
     TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
-    stakingPool.stake(amount);
+    _depositToUnderlyingVault(amount);
 
     // mint pToken to user
     uint256 pTokenAmount = amount;
@@ -209,7 +203,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
       TokensTransfer.transferTokens(address(_assetToken), address(this), IProtocolSettings(settings).treasury(), fees);
     }
     uint256 netAmount = amount - fees;
-    stakingPool.stake(netAmount);
+    _depositToUnderlyingVault(netAmount);
 
     uint256 pTokenAmount = netAmount;
     IPToken(_pToken).rebase(pTokenAmount);
@@ -263,8 +257,8 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     }
 
     // withdraw all assets from staking pool
-    if (stakingPool.balanceOf(address(this)) > 0) {
-      stakingPool.exit();
+    if (_balanceOfUnderlyingVault() > 0) {
+      _exitUnderlyingVault();
     }
 
     emit Closed();
@@ -343,7 +337,7 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
     uint256 amount = redeemPool.totalRedeemingBalance();
     if (amount > 0) {
       IPToken(_pToken).burn(address(redeemPool), amount);
-      stakingPool.withdraw(amount);
+      _withdrawFromUnderlyingVault(amount);
       TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), amount);
     }
 
@@ -380,41 +374,19 @@ contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtens
   }
 
   function _updateStakingBribes() internal {
-    uint256 epochId = _currentEpochId.current();
-
-    IBribesPool stakingBribesPool = IBribesPool(_epochs[epochId].stakingBribesPool);
-    // Keep bribes unclaimed, if nobody swapped for YT yet in this epoch
-    if (stakingBribesPool.totalSupply() == 0) {
-      return;
-    }
-
-    uint256 rewardTokensCount = 0;
-    while(true) {
-      try stakingPool.rewardTokens(rewardTokensCount) returns (address) {
-        rewardTokensCount++;
-      } catch {
-        break;
-      }
-    }
-
-    address[] memory rewardTokens = new address[](rewardTokensCount);
-    for (uint256 i = 0; i < rewardTokens.length; i++) {
-      rewardTokens[i] = stakingPool.rewardTokens(i);
-    }
-
-    stakingPool.getReward();
-
-    for (uint256 i = 0; i < rewardTokens.length; i++) {
-      address bribeToken = rewardTokens[i];
-      uint256 allBribes = IERC20(bribeToken).balanceOf(address(this));
-
-      // Add bribes to auto bribes pool
-      if (allBribes > 0) {
-        IERC20(bribeToken).approve(address(stakingBribesPool), allBribes);
-        stakingBribesPool.addBribes(bribeToken, allBribes);
-      }
-    }
+    _getRewardsFromUnderlyingVault();
   }
+
+  function _balanceOfUnderlyingVault() internal view virtual returns (uint256);
+
+  function _depositToUnderlyingVault(uint256 amount) internal virtual;
+
+  function _withdrawFromUnderlyingVault(uint256 amount) internal virtual;
+
+  function _getRewardsFromUnderlyingVault() internal virtual;
+
+  function _exitUnderlyingVault() internal virtual;
+
 
   /* ============== MODIFIERS =============== */
 
