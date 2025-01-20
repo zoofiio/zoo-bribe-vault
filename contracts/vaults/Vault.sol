@@ -39,6 +39,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   IERC20 internal immutable _assetToken;
   IPToken internal immutable _pToken;
+  uint8 public immutable ytDecimals;
 
   Counters.Counter internal _currentEpochId;  // default to 0
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
@@ -73,7 +74,9 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
     _assetToken = IERC20(_assetToken_);
     // PToken's decimals should be the same as the asset token's decimals
-    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, IERC20Metadata(_assetToken_).decimals());
+    uint8 assetDecimals = IERC20Metadata(_assetToken_).decimals();
+    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, assetDecimals);
+    ytDecimals = assetDecimals;
   }
 
   /* ================= VIEWS ================ */
@@ -374,7 +377,13 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   }
 
   function _updateStakingBribes() internal {
-    _getRewardsFromUnderlyingVault();
+    IBribesPool stakingBribesPool = IBribesPool(_epochs[currentEpochId()].stakingBribesPool);
+    // Keep bribes unclaimed, if nobody swapped for YT yet in this epoch
+    if (stakingBribesPool.totalSupply() == 0) {
+      return;
+    }
+
+    _getRewardsFromUnderlyingVault(stakingBribesPool);
   }
 
   function _balanceOfUnderlyingVault() internal view virtual returns (uint256);
@@ -383,7 +392,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   function _withdrawFromUnderlyingVault(uint256 amount) internal virtual;
 
-  function _getRewardsFromUnderlyingVault() internal virtual;
+  function _getRewardsFromUnderlyingVault(IBribesPool stakingBribesPool) internal virtual;
 
   function _exitUnderlyingVault() internal virtual;
 

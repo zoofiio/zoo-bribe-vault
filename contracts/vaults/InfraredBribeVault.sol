@@ -6,7 +6,7 @@ pragma solidity ^0.8.18;
 import "../interfaces/IStakingPool.sol";
 import "./Vault.sol";
 
-contract InfraredVault is Vault {
+contract InfraredBribeVault is Vault {
 
   IStakingPool public stakingPool;
 
@@ -39,15 +39,7 @@ contract InfraredVault is Vault {
     stakingPool.withdraw(amount);
   }
 
-  function _getRewardsFromUnderlyingVault() internal override {
-    uint256 epochId = currentEpochId();
-
-    IBribesPool stakingBribesPool = IBribesPool(_epochs[epochId].stakingBribesPool);
-    // Keep bribes unclaimed, if nobody swapped for YT yet in this epoch
-    if (stakingBribesPool.totalSupply() == 0) {
-      return;
-    }
-
+  function _getRewardsFromUnderlyingVault(IBribesPool stakingBribesPool) internal override {
     uint256 rewardTokensCount = 0;
     while(true) {
       try stakingPool.rewardTokens(rewardTokensCount) returns (address) {
@@ -68,7 +60,7 @@ contract InfraredVault is Vault {
       address bribeToken = rewardTokens[i];
       uint256 allBribes = IERC20(bribeToken).balanceOf(address(this));
 
-      // Add bribes to auto bribes pool
+      // Add bribes to bribes pool
       if (allBribes > 0) {
         IERC20(bribeToken).approve(address(stakingBribesPool), allBribes);
         stakingBribesPool.addBribes(bribeToken, allBribes);

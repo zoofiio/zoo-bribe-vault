@@ -18,7 +18,7 @@ const { provider } = ethers;
 
 const BigNumber = require('bignumber.js');
 
-describe('Bribe Vault', () => {
+describe('Infrared Bribe Vault', () => {
 
   it('Bribe Vault basic E2E works', async () => {
     const { protocol, settings, vault, stakingPool, iBGT, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);

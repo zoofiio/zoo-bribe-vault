@@ -59,7 +59,7 @@ describe("Ownable", () => {
     const MockERC20Factory = await ethers.getContractFactory("MockERC20");
     const MockERC20 = await MockERC20Factory.deploy(await protocol.getAddress(), "Dummy Token", "DMY", 18);
     const dummyToken = MockERC20__factory.connect(await MockERC20.getAddress(), provider);
-    const VaultFactory = await ethers.getContractFactory("InfraredVaultFactory", {
+    const VaultFactory = await ethers.getContractFactory("InfraredBribeVault", {
       libraries: {
         VaultCalculator: await vaultCalculator.getAddress(),
       }
