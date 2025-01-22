@@ -23,7 +23,7 @@ contract YeetBribeVault is Vault {
   ) Vault(_protocol, _settings, _redeemPoolFactory, _bribesPoolFactory, _assetToken_, _pTokenName, _pTokensymbol) {
     require(_trifectaVault_ != address(0), "Zero address detected");
     
-    trifectaVault = IYeetTrifectaVault(trifectaVault);
+    trifectaVault = IYeetTrifectaVault(_trifectaVault_);
     _assetToken.approve(address(trifectaVault), type(uint256).max);
   }
 
@@ -75,7 +75,7 @@ contract YeetBribeVault is Vault {
 
     if (yields > 0) {
       uint256 bpsScale = trifectaVault._BASIS_POINT_SCALE();
-      uint256 bps = trifectaVault.maxAllowedFeeBps();
+      uint256 bps = trifectaVault.exitFeeBasisPoints();
       uint256 withdrawAmount = yields.mulDiv(
         bpsScale,
         bpsScale + bps * bpsScale
@@ -84,6 +84,8 @@ contract YeetBribeVault is Vault {
     }
 
     uint256 actualYields = _assetToken.balanceOf(address(this)) - prevAssetBalance;
+    // console.log("YeetBribeVault, previous balance: %s, new balance: %s, yields: %s", prevAssetBalance, _assetToken.balanceOf(address(this)), actualYields);
+
     if (actualYields > 0) {
       IERC20(address(_assetToken)).approve(address(stakingBribesPool), actualYields);
       stakingBribesPool.addBribes(address(_assetToken), actualYields);

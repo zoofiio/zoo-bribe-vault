@@ -5,12 +5,12 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-contract MockERC4626 is ERC4626 {
+contract MockYeetTrifectaVault is ERC4626 {
   using SafeERC20 for IERC20;
   using Math for uint256;
 
   uint256 public immutable _BASIS_POINT_SCALE = 1e4;
-  uint256 public exitFeeBasisPoints = 1e3; // 10%
+  uint256 public exitFeeBasisPoints = 0;
 
   address public treasury;
 

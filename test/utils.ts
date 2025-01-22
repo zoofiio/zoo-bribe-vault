@@ -14,6 +14,7 @@ import {
   RedeemPoolFactory__factory,
   BribesPoolFactory__factory,
   Vault,
+  MockYeetTrifectaVault__factory,
 } from "../typechain";
 
 const { provider } = ethers;
@@ -100,10 +101,52 @@ export async function deployContractsFixture() {
   trans = await protocol.connect(Alice).addVault(await vault8.getAddress());
   await trans.wait();
 
+  const yeetLpToken = await MockERC20Factory.deploy(await protocol.getAddress(), "WBEAR-YEET Token", "WBEAR-YEET", 18);
+  const yeetLp = MockERC20__factory.connect(await yeetLpToken.getAddress(), provider);
+  const yeetLp8Token = await MockERC20Factory.deploy(await protocol.getAddress(), "WBEAR-YEET 8 Token", "WBEAR-YEET-8", 8);
+  const yeetLp8 = MockERC20__factory.connect(await yeetLp8Token.getAddress(), provider);
+
+  const MockYeetTrifectaVaultFactory = await ethers.getContractFactory("MockYeetTrifectaVault");
+  const trifectaVaultContract = await MockYeetTrifectaVaultFactory.deploy(
+    await yeetLpToken.getAddress(), "Yeet Trifecta Vault", "TRI-WBEAR-YEET", Ivy
+  );
+  const trifectaVault = MockYeetTrifectaVault__factory.connect(await trifectaVaultContract.getAddress(), provider);
+  const trifectaVaultContract8 = await MockYeetTrifectaVaultFactory.deploy(
+    await yeetLp8Token.getAddress(), "Yeet Trifecta Vault 8", "TRI-WBEAR-YEET-8", Ivy
+  );
+  const trifectaVault8 = MockYeetTrifectaVault__factory.connect(await trifectaVaultContract8.getAddress(), provider);
+
+  const YeetBribeVaultFactory = await ethers.getContractFactory("YeetBribeVault", {
+    libraries: {
+      VaultCalculator: await vaultCalculator.getAddress(),
+    }
+  });
+  const yeetBribeVaultContract = await YeetBribeVaultFactory.deploy(
+    await protocol.getAddress(), await settings.getAddress(),
+    await redeemPoolFactory.getAddress(),
+    await bribesPoolFactory.getAddress(),
+    await trifectaVault.getAddress(),
+    await yeetLp.getAddress(), "Zoo pYeetLP", "pYeetLP"
+  );
+  const yeetVault = Vault__factory.connect(await yeetBribeVaultContract.getAddress(), provider);
+  trans = await protocol.connect(Alice).addVault(await yeetVault.getAddress());
+  await trans.wait();
+
+  const yeetBribeVaultContract8 = await YeetBribeVaultFactory.deploy(
+    await protocol.getAddress(), await settings.getAddress(),
+    await redeemPoolFactory.getAddress(),
+    await bribesPoolFactory.getAddress(),
+    await trifectaVault8.getAddress(),
+    await yeetLp8.getAddress(), "Zoo pYeetLP 8", "pYeetLP8"
+  );
+  const yeetVault8 = Vault__factory.connect(await yeetBribeVaultContract8.getAddress(), provider);
+  trans = await protocol.connect(Alice).addVault(await yeetVault8.getAddress());
+  await trans.wait();
+
   return { 
-    Alice, Bob, Caro, Dave,
+    Alice, Bob, Caro, Dave, Ivy,
     protocol, settings, redeemPoolFactory, bribesPoolFactory, stakingPool, stakingPool8,
-    iBGT, iBGT8, stETH, vaultCalculator, vault, vault8
+    iBGT, iBGT8, stETH, vaultCalculator, vault, vault8, yeetLp, yeetLp8, trifectaVault, trifectaVault8, yeetVault, yeetVault8
   };
 }
 
