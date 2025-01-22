@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract, wait1Tx } from "./hutils";
-import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Vault__factory } from "../typechain";
+import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Vault__factory, YeetBribeVault__factory } from "../typechain";
 
 dotenv.config();
 
@@ -68,11 +68,30 @@ async function main() {
     console.log(`Added vault ${name}_${index} to protocol`);
   };
 
+  const deployYeetVault = async (asset: string, yeetTrifectaVault: string, pTokenName: string, pTokenSymbol: string) => {
+    const vaultAddress = await deployContract(
+      "YeetBribeVault",
+      [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, bribesPoolFactoryAddress, yeetTrifectaVault, asset, pTokenName, pTokenSymbol],
+      `YeetBribeVault`,
+      {
+        libraries: {
+          VaultCalculator: vaultCalculatorAddress,
+        },
+      }
+    );
+    console.info(`$YeetBribeVault pToken:`, await YeetBribeVault__factory.connect(vaultAddress, ethers.provider).pToken());
+    await addVault(vaultAddress);
+    console.log(`Added YeetBribeVault to protocol`);
+  };
+
   // Deploy $HONEY-USDC-LP vault
   // await deployVault("0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96", "0x675547750F4acdf64eD72e9426293f38d8138CA8", "HONEY-USDC-LP", 1);
+  
   // HONEY-WBERA
-  await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 1);
-  await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 2);
+  // await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 1);
+  // await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 2);
+
+  await deployYeetVault("0x0001513F4a1f86da0f02e647609E9E2c630B3a14", "0x208008F377Ad00ac07A646A1c3eA6b70eB9Fc511", "Zoo pBERAYEET", "pBERAYEET");
 }
 
 // We recommend this pattern to be able to use async/await everywhere
