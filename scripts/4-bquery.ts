@@ -15,7 +15,7 @@ async function main() {
   for (const lp of lps) {
     await bQuery.setLP(lp, true).then((tx) => tx.wait(2));
   }
-  const vault = '0x77412b08bB3a8c38F7D0DC7D1158C5E7bfE03Eea';
+  const vault = '0x12f5F1f53B419d1E5F3084E649001Ff091683ADc';
   const current = await bQuery.queryBVault(vault);
   console.info("bVault", current);
   // for (let i = current.epochCount; i > 0n; i--) {
