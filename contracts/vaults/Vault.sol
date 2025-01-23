@@ -182,10 +182,9 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   function redeem(uint256 amount) external nonReentrant whenClosed noneZeroAmount(amount) {
     require(amount <= IPToken(_pToken).balanceOf(_msgSender()));
+    uint256 sharesAmount = IPToken(_pToken).getSharesByBalance(amount);
 
-    uint256 sharesAmount = IPToken(_pToken).burn(_msgSender(), amount);
-    TokensTransfer.transferTokens(address(_assetToken), address(this), _msgSender(), amount);
-    
+    _redeemOnClose(amount);
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
@@ -259,10 +258,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
       _updateStakingBribes();
     }
 
-    // withdraw all assets from staking pool
-    if (_balanceOfUnderlyingVault() > 0) {
-      _exitUnderlyingVault();
-    }
+    _onVaultClose();
 
     emit Closed();
   }
@@ -334,17 +330,8 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   function _onEndEpoch(uint256 epochId) internal {
     Constants.Epoch memory epoch = _epochs[epochId];
-
     IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
-
-    uint256 amount = redeemPool.totalRedeemingBalance();
-    if (amount > 0) {
-      IPToken(_pToken).burn(address(redeemPool), amount);
-      _withdrawFromUnderlyingVault(amount);
-      TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), amount);
-    }
-
-    redeemPool.notifySettlement(amount);
+    _settleRedeemPool(redeemPool);
   }
 
   function _startNewEpoch(uint256 deltaYTokenAmount) internal {
@@ -383,18 +370,20 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
       return;
     }
 
-    _getRewardsFromUnderlyingVault(stakingBribesPool);
+    _doUpdateStakingBribes(stakingBribesPool);
   }
 
   function _balanceOfUnderlyingVault() internal view virtual returns (uint256);
 
   function _depositToUnderlyingVault(uint256 amount) internal virtual;
 
-  function _withdrawFromUnderlyingVault(uint256 amount) internal virtual;
+  function _settleRedeemPool(IRedeemPool redeemPool) internal virtual;
 
-  function _getRewardsFromUnderlyingVault(IBribesPool stakingBribesPool) internal virtual;
+  function _doUpdateStakingBribes(IBribesPool stakingBribesPool) internal virtual;
 
-  function _exitUnderlyingVault() internal virtual;
+  function _onVaultClose() internal virtual;
+
+  function _redeemOnClose(uint256 ptAmount) internal virtual;
 
 
   /* ============== MODIFIERS =============== */

@@ -17,4 +17,10 @@ interface IYeetTrifectaVault is IERC4626 {
    */
   function exitFeeBasisPoints() external view returns (uint256);
 
+  /**
+   * @notice Maximum allowed fee in basis points
+   * @return The maximum fee that can be set, in basis points
+   */
+  function maxAllowedFeeBps() external view returns (uint256);
+
 }

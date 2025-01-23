@@ -3,7 +3,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import dotenv from "dotenv";
 import { ethers } from "hardhat";
 import { deployContract, wait1Tx } from "./hutils";
-import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Vault__factory, YeetBribeVault__factory } from "../typechain";
+import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Vault__factory, ERC4626BribeVault__factory } from "../typechain";
 
 dotenv.config();
 
@@ -70,18 +70,18 @@ async function main() {
 
   const deployYeetVault = async (asset: string, yeetTrifectaVault: string, pTokenName: string, pTokenSymbol: string) => {
     const vaultAddress = await deployContract(
-      "YeetBribeVault",
+      "ERC4626BribeVault",
       [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, bribesPoolFactoryAddress, yeetTrifectaVault, asset, pTokenName, pTokenSymbol],
-      `YeetBribeVault`,
+      `ERC4626BribeVault`,
       {
         libraries: {
           VaultCalculator: vaultCalculatorAddress,
         },
       }
     );
-    console.info(`$YeetBribeVault pToken:`, await YeetBribeVault__factory.connect(vaultAddress, ethers.provider).pToken());
+    console.info(`$ERC4626BribeVault pToken:`, await ERC4626BribeVault__factory.connect(vaultAddress, ethers.provider).pToken());
     await addVault(vaultAddress);
-    console.log(`Added YeetBribeVault to protocol`);
+    console.log(`Added ERC4626BribeVault to protocol`);
   };
 
   // Deploy $HONEY-USDC-LP vault

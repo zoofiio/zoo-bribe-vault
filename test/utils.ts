@@ -9,6 +9,7 @@ import {
   MockRebasableERC20__factory,
   ZooProtocol__factory,
   Vault__factory,
+  ERC4626BribeVault__factory,
   VaultCalculator__factory,
   MockStakingPool__factory,
   RedeemPoolFactory__factory,
@@ -21,7 +22,7 @@ const { provider } = ethers;
 
 export const ONE_DAY_IN_SECS = 24 * 60 * 60;
 
-export const SETTINGS_DECIMALS = 10;
+export const SETTINGS_DECIMALS = 10n;
 
 export const nativeTokenAddress = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
 
@@ -116,30 +117,30 @@ export async function deployContractsFixture() {
   );
   const trifectaVault8 = MockYeetTrifectaVault__factory.connect(await trifectaVaultContract8.getAddress(), provider);
 
-  const YeetBribeVaultFactory = await ethers.getContractFactory("YeetBribeVault", {
+  const ERC4626BribeVaultFactory = await ethers.getContractFactory("ERC4626BribeVault", {
     libraries: {
       VaultCalculator: await vaultCalculator.getAddress(),
     }
   });
-  const yeetBribeVaultContract = await YeetBribeVaultFactory.deploy(
+  const yeetBribeVaultContract = await ERC4626BribeVaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(),
     await redeemPoolFactory.getAddress(),
     await bribesPoolFactory.getAddress(),
     await trifectaVault.getAddress(),
     await yeetLp.getAddress(), "Zoo pYeetLP", "pYeetLP"
   );
-  const yeetVault = Vault__factory.connect(await yeetBribeVaultContract.getAddress(), provider);
+  const yeetVault = ERC4626BribeVault__factory.connect(await yeetBribeVaultContract.getAddress(), provider);
   trans = await protocol.connect(Alice).addVault(await yeetVault.getAddress());
   await trans.wait();
 
-  const yeetBribeVaultContract8 = await YeetBribeVaultFactory.deploy(
+  const yeetBribeVaultContract8 = await ERC4626BribeVaultFactory.deploy(
     await protocol.getAddress(), await settings.getAddress(),
     await redeemPoolFactory.getAddress(),
     await bribesPoolFactory.getAddress(),
     await trifectaVault8.getAddress(),
     await yeetLp8.getAddress(), "Zoo pYeetLP 8", "pYeetLP8"
   );
-  const yeetVault8 = Vault__factory.connect(await yeetBribeVaultContract8.getAddress(), provider);
+  const yeetVault8 = ERC4626BribeVault__factory.connect(await yeetBribeVaultContract8.getAddress(), provider);
   trans = await protocol.connect(Alice).addVault(await yeetVault8.getAddress());
   await trans.wait();
 

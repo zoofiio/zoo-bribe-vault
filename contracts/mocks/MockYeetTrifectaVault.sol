@@ -10,7 +10,7 @@ contract MockYeetTrifectaVault is ERC4626 {
   using Math for uint256;
 
   uint256 public immutable _BASIS_POINT_SCALE = 1e4;
-  uint256 public exitFeeBasisPoints = 0;
+  uint256 public exitFeeBasisPoints = 1e3;  // 10%
 
   address public treasury;
 

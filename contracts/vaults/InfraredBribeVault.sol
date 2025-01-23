@@ -35,11 +35,18 @@ contract InfraredBribeVault is Vault {
     stakingPool.stake(amount);
   }
 
-  function _withdrawFromUnderlyingVault(uint256 amount) internal override {
-    stakingPool.withdraw(amount);
+  function _settleRedeemPool(IRedeemPool redeemPool) internal override {
+    uint256 amount = redeemPool.totalRedeemingBalance();
+    if (amount > 0) {
+      IPToken(_pToken).burn(address(redeemPool), amount);
+      stakingPool.withdraw(amount);
+      TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), amount);
+    }
+
+    redeemPool.notifySettlement(amount);
   }
 
-  function _getRewardsFromUnderlyingVault(IBribesPool stakingBribesPool) internal override {
+  function _doUpdateStakingBribes(IBribesPool stakingBribesPool) internal override {
     uint256 rewardTokensCount = 0;
     while(true) {
       try stakingPool.rewardTokens(rewardTokensCount) returns (address) {
@@ -68,8 +75,15 @@ contract InfraredBribeVault is Vault {
     }
   }
 
-  function _exitUnderlyingVault() internal override {
-    stakingPool.exit();
+  function _onVaultClose() internal override {
+    if (stakingPool.balanceOf(address(this)) > 0) {
+      stakingPool.exit();
+    }
+  }
+
+  function _redeemOnClose(uint256 ptAmount) internal override {
+    IPToken(_pToken).burn(_msgSender(), ptAmount);
+    TokensTransfer.transferTokens(address(_assetToken), address(this), _msgSender(), ptAmount);
   }
 
 }

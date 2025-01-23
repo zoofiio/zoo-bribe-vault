@@ -12,6 +12,12 @@ async function main() {
   // https://bartio.beratrail.io/address/0x0001513F4a1f86da0f02e647609E9E2c630B3a14
   const asset = await yeetTrifectaVault.asset();
   console.log(`Yeet Trifecta Asset: ${asset}`);
+
+  const maxFeeBps = await yeetTrifectaVault.maxAllowedFeeBps();
+  console.log(`Yeet Trifecta maxAllowedFeeBps: ${maxFeeBps}`);
+
+  const feeBps = await yeetTrifectaVault.exitFeeBasisPoints();
+  console.log(`Yeet Trifecta exitFeeBasisPoints: ${feeBps}`);
 }
 
 main().catch((error) => {

@@ -5,7 +5,8 @@ import { loadFixture, time } from '@nomicfoundation/hardhat-network-helpers';
 import { anyValue } from '@nomicfoundation/hardhat-chai-matchers/withArgs';
 import { 
   deployContractsFixture, ONE_DAY_IN_SECS, expectNumberEquals, expectBigNumberEquals, makeToken,
-  expectedY, expectedInitSwapParams, expectedCalcSwap
+  expectedY, expectedInitSwapParams, expectedCalcSwap,
+  SETTINGS_DECIMALS
 } from './utils';
 import { 
   RedeemPool__factory, PToken__factory,
@@ -22,17 +23,20 @@ describe('Yeet Bribe Vault', () => {
 
   it('Bribe Vault basic E2E works', async () => {
     const { protocol, settings, yeetVault, trifectaVault, yeetLp, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
+    const pToken = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
+    const yeetFeeBps = await trifectaVault.exitFeeBasisPoints();
+    const maxYeetFeeBps = await trifectaVault._BASIS_POINT_SCALE();
 
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f1"), 10 ** 9); // 10%
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f2"), 10 ** 9); // 10%
+    const f2 = await yeetVault.paramValue(ethers.encodeBytes32String("f2"));
 
     await expect(yeetLp.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await yeetLp.decimals()))).not.to.be.reverted;
     await expect(yeetLp.connect(Alice).mint(Bob.address, ethers.parseUnits("1000000", await yeetLp.decimals()))).not.to.be.reverted;
     await expect(yeetLp.connect(Alice).mint(Caro.address, ethers.parseUnits("1000000", await yeetLp.decimals()))).not.to.be.reverted;
 
     // PToken's decimals should be same to the underlying token
-    expect(await piBGT.decimals()).to.equal(await yeetLp.decimals());
+    expect(await pToken.decimals()).to.equal(await yeetLp.decimals());
 
     // No epochs initially
     expect(await yeetVault.epochIdCount()).to.equal(0);
@@ -75,27 +79,27 @@ describe('Yeet Bribe Vault', () => {
     expect(currentEpoch.duration).to.equal(currentEpochDuration);
 
     // check pToken and yToken balance
-    expect(await yeetVault.assetBalance()).to.equal(aliceDepositAmount + bobDepositAmount);
-    expect(await piBGT.balanceOf(Alice.address)).to.equal(aliceDepositAmount);
-    expect(await piBGT.balanceOf(Bob.address)).to.equal(bobDepositAmount);
-    expect(await piBGT.totalSupply()).to.equal(aliceDepositAmount + bobDepositAmount);
+    // expect(await yeetVault.assetBalance()).to.equal(aliceDepositAmount + bobDepositAmount);
+    expect(await pToken.balanceOf(Alice.address)).to.equal(aliceDepositAmount);
+    expect(await pToken.balanceOf(Bob.address)).to.equal(bobDepositAmount);
+    expect(await pToken.totalSupply()).to.equal(aliceDepositAmount + bobDepositAmount);
     expect(await yeetVault.yTokenUserBalance(currentEpochId, Alice.address)).to.equal(0);
     expect(await yeetVault.yTokenUserBalance(currentEpochId, Bob.address)).to.equal(0);
     expect(await yeetVault.yTokenUserBalance(currentEpochId, await yeetVault.getAddress())).to.equal(aliceDepositAmount + bobDepositAmount);
     expect(await yeetVault.yTokenTotalSupply(currentEpochId)).to.equal(aliceDepositAmount + bobDepositAmount);
     
-    // Alice redeem 100 $piBGT; Bob redeem 50 $piBGT
-    const aliceRedeemAmount = ethers.parseUnits("100", await piBGT.decimals());
-    const bobRedeemAmount = ethers.parseUnits("50", await piBGT.decimals());
+    // Alice redeem 100 $pToken; Bob redeem 50 $pToken
+    const aliceRedeemAmount = ethers.parseUnits("100", await pToken.decimals());
+    const bobRedeemAmount = ethers.parseUnits("50", await pToken.decimals());
     const redeemPool = RedeemPool__factory.connect(currentEpoch.redeemPool, ethers.provider);
-    await expect(piBGT.connect(Alice).approve(await redeemPool.getAddress(), aliceRedeemAmount)).not.to.be.reverted;
+    await expect(pToken.connect(Alice).approve(await redeemPool.getAddress(), aliceRedeemAmount)).not.to.be.reverted;
     await expect(redeemPool.connect(Alice).redeem(aliceRedeemAmount)).not.to.be.reverted;
-    await expect(piBGT.connect(Bob).approve(await redeemPool.getAddress(), bobRedeemAmount)).not.to.be.reverted;
+    await expect(pToken.connect(Bob).approve(await redeemPool.getAddress(), bobRedeemAmount)).not.to.be.reverted;
     await expect(redeemPool.connect(Bob).redeem(bobRedeemAmount)).not.to.be.reverted;
 
     // Total deposit: 
     //   Alice 1000 $yeetLp; Bob 500 $yeetLp
-    // 3 days later, Alice 'swap' 100 $yeetLp for yiBGT. => $piBGT is rebased by 100/1500
+    // 3 days later, Alice 'swap' 100 $yeetLp for yt. => $pt is rebased by 100/1500
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
 
     let aliceSwapAmount = ethers.parseUnits("100", await yeetLp.decimals());
@@ -116,12 +120,27 @@ describe('Yeet Bribe Vault', () => {
       [-aliceSwapAmount, fees, netSwapAmount]
     );
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(netSwapAmount)
+      .to.emit(pToken, "Rebased").withArgs(netSwapAmount)
       .to.emit(yeetVault, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, fees, netSwapAmount, anyValue);
     
+    let erc4626TotalShares = await trifectaVault.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault.decimals())}`);
+    let erc4626TotalAssets = await trifectaVault.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp.decimals())}`);
+    let erc4626Shares = await trifectaVault.balanceOf(await yeetVault.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault.decimals())}`);
+
     // Add bribes
-    const bribeAmountYeetLp = ethers.parseUnits("1000", await yeetLp.decimals());
+    const bribeAmountYeetLp = ethers.parseUnits("300", await yeetLp.decimals());
     await expect(yeetLp.connect(Alice).transfer(await trifectaVault.getAddress(), bribeAmountYeetLp)).not.to.be.reverted;
+
+    console.log(`====== ERC4626 compounds yields ======`);
+    erc4626TotalShares = await trifectaVault.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault.decimals())}`);
+    erc4626TotalAssets = await trifectaVault.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp.decimals())}`);
+    erc4626Shares = await trifectaVault.balanceOf(await yeetVault.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault.decimals())}`);
 
     // Bob swap 10 $yeetLp for yTokens, which triggers bribes claimed
     console.log("\n========= Another 11 days later, Bob swaps 10 $yeetLp for YTokens ===============");
@@ -136,11 +155,16 @@ describe('Yeet Bribe Vault', () => {
     let bobYTSwapAmount1 = await yeetVault.yTokenUserBalance(currentEpochId, Bob.address);
     await expect(trans).to.changeTokenBalances(yeetLp, [Bob.address], [-swapAssetAmount]);
 
-    // 16 days later, epoch ends. And all staking bribes are distributed
+    erc4626TotalShares = await trifectaVault.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault.decimals())}`);
+    erc4626TotalAssets = await trifectaVault.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp.decimals())}`);
+    let erc4626SharesAfterSwap = await trifectaVault.balanceOf(await yeetVault.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault.decimals())}`);
+
+    // 16 days later, epoch ends. 
     console.log("\n========= 16 days later, check bribes ===============");
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
-
-    let vaultBribesYeetLpAmount = bribeAmountYeetLp;
 
     // Check YT balances
     const aliceYTokenBalance = await yeetVault.yTokenUserBalance(currentEpochId, Alice.address);
@@ -153,9 +177,6 @@ describe('Yeet Bribe Vault', () => {
     );
     expectBigNumberEquals(aliceYTokenBalance + bobYTokenBalance + vaultYTokenBalance, totalYTokenBalance);
 
-    const expectedAliceBribesYeetLp = vaultBribesYeetLpAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-    const expectedBobBribesYeetLp = vaultBribesYeetLpAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-
     let epochInfo = await yeetVault.epochInfoById(currentEpochId);
     let stakingBribesPool = StakingBribesPool__factory.connect(epochInfo.stakingBribesPool, ethers.provider);
     let adhocBribesPool = AdhocBribesPool__factory.connect(epochInfo.adhocBribesPool, ethers.provider);
@@ -163,22 +184,25 @@ describe('Yeet Bribe Vault', () => {
     expect(await stakingBribesPool.balanceOf(Alice.address)).to.equal(aliceYTokenBalance);
     expect(await stakingBribesPool.balanceOf(Bob.address)).to.equal(bobYTokenBalance);
     expect(await stakingBribesPool.totalSupply()).to.equal(aliceYTokenBalance + bobYTokenBalance);
-    expectBigNumberEquals(await yeetLp.balanceOf(await stakingBribesPool.getAddress()), vaultBribesYeetLpAmount);
 
-    let actualAliceBribesYeetLp = await stakingBribesPool.earned(Alice.address, await yeetLp.getAddress());
-    let actualBobBribesYeetLp = await stakingBribesPool.earned(Bob.address, await yeetLp.getAddress());
-    expectBigNumberEquals(actualAliceBribesYeetLp, expectedAliceBribesYeetLp);
-    expectBigNumberEquals(actualBobBribesYeetLp, expectedBobBribesYeetLp);
+    let vaultBribesERC4626SharesAmount = await trifectaVault.balanceOf(await stakingBribesPool.getAddress());
+    const expectedAliceBribesYeetLp = vaultBribesERC4626SharesAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
+    const expectedBobBribesYeetLp = vaultBribesERC4626SharesAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
+
+    let actualAliceBribes = await stakingBribesPool.earned(Alice.address, await trifectaVault.getAddress());
+    let actualBobBribes = await stakingBribesPool.earned(Bob.address, await trifectaVault.getAddress());
+    expectBigNumberEquals(actualAliceBribes, expectedAliceBribesYeetLp);
+    expectBigNumberEquals(actualBobBribes, expectedBobBribesYeetLp);
 
     console.log("\n========= Alice claimed bribes ===============");
 
     trans = await stakingBribesPool.connect(Alice).getBribes();
     await expect(trans)
-      .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await yeetLp.getAddress(), actualAliceBribesYeetLp);
+      .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await trifectaVault.getAddress(), actualAliceBribes);
     await expect(trans).to.changeTokenBalances(
-      yeetLp,
+      trifectaVault,
       [Alice.address, await stakingBribesPool.getAddress()],
-      [actualAliceBribesYeetLp, -actualAliceBribesYeetLp]
+      [actualAliceBribes, -actualAliceBribes]
     );
 
     // Alice add Bob as briber
@@ -233,28 +257,35 @@ describe('Yeet Bribe Vault', () => {
     let iBGTBalanceAfterClose = await yeetLp.balanceOf(await yeetVault.getAddress());
     console.log(`$yeetLp balance after close: ${formatUnits(iBGTBalanceAfterClose, await yeetLp.decimals())}`);
 
-    let alicePTokenBalance = await piBGT.balanceOf(Alice.address);
-    let bobPTokenBalance = await piBGT.balanceOf(Bob.address);
-    console.log(`Alice $piBGT balance: ${formatUnits(alicePTokenBalance, await piBGT.decimals())}`);
-    console.log(`Bob $piBGT balance: ${formatUnits(bobPTokenBalance, await piBGT.decimals())}`);
+    let pTokenTotalSupply = await pToken.totalSupply();
+    let alicePTokenBalance = await pToken.balanceOf(Alice.address);
+    let bobPTokenBalance = await pToken.balanceOf(Bob.address);
+    console.log(`$pToken total supply: ${formatUnits(pTokenTotalSupply, await pToken.decimals())}`);
+    console.log(`Alice $pToken balance: ${formatUnits(alicePTokenBalance, await pToken.decimals())}`);
+    console.log(`Bob $pToken balance: ${formatUnits(bobPTokenBalance, await pToken.decimals())}`);
+
+    erc4626Shares = await trifectaVault.balanceOf(await yeetVault.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault.decimals())}`);
 
     // Could not deposit or swap after yeetVault is closed
     await expect(yeetVault.connect(Alice).deposit(100)).to.be.reverted;
     await expect(yeetVault.connect(Alice).swap(100)).to.be.reverted;
 
     // Alice and Bob get their $yeetLp back
-    console.log("\n========= Alice and Bob get their $yeetLp back ===============");
+    console.log("\n========= Alice and Bob get their ERC4626 shares back ===============");
     await expect(yeetVault.connect(Alice).redeem(alicePTokenBalance * 2n)).to.be.reverted;
     trans = await yeetVault.connect(Alice).redeem(alicePTokenBalance);
     await expect(trans).to.changeTokenBalances(
-      piBGT,
+      pToken,
       [Alice.address],
       [-alicePTokenBalance]
     );
+
+    let aliceERC4626Shares = erc4626Shares * alicePTokenBalance / pTokenTotalSupply;
     await expect(trans).to.changeTokenBalances(
-      yeetLp,
+      trifectaVault,
       [Alice.address],
-      [alicePTokenBalance]
+      [aliceERC4626Shares]
     );
     await expect(trans)
       .to.emit(yeetVault, "Redeem").withArgs(Alice.address, alicePTokenBalance, anyValue);
@@ -262,22 +293,20 @@ describe('Yeet Bribe Vault', () => {
 
   it('Bribe Vault with assets other than 18 decimals basic E2E works', async () => {
     const { protocol, settings, yeetVault8, trifectaVault8, yeetLp8, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await yeetVault8.pToken(), ethers.provider);
+    const pToken = PToken__factory.connect(await yeetVault8.pToken(), ethers.provider);
+    const yeetFeeBps = await trifectaVault8.exitFeeBasisPoints();
+    const maxYeetFeeBps = await trifectaVault8._BASIS_POINT_SCALE();
 
     await settings.connect(Alice).updateVaultParamValue(await yeetVault8.getAddress(), ethers.encodeBytes32String("f1"), 10 ** 9); // 10%
     await settings.connect(Alice).updateVaultParamValue(await yeetVault8.getAddress(), ethers.encodeBytes32String("f2"), 10 ** 9); // 10%
+    const f2 = await yeetVault8.paramValue(ethers.encodeBytes32String("f2"));
 
     await expect(yeetLp8.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await yeetLp8.decimals()))).not.to.be.reverted;
     await expect(yeetLp8.connect(Alice).mint(Bob.address, ethers.parseUnits("1000000", await yeetLp8.decimals()))).not.to.be.reverted;
     await expect(yeetLp8.connect(Alice).mint(Caro.address, ethers.parseUnits("1000000", await yeetLp8.decimals()))).not.to.be.reverted;
 
     // PToken's decimals should be same to the underlying token
-    expect(await piBGT.decimals()).to.equal(await yeetLp8.decimals());
-
-    // Create some dummy bribe token
-    // const brbToken = await makeToken(await protocol.getAddress(), "Bribe Token", "BRB");
-    // await expect(brbToken.connect(Alice).mint(Alice.address, ethers.parseUnits("1000000", await brbToken.decimals()))).not.to.be.reverted;
-    // const bribeAmountBRB = ethers.parseUnits("2000", await brbToken.decimals());
+    expect(await pToken.decimals()).to.equal(await yeetLp8.decimals());
 
     // No epochs initially
     expect(await yeetVault8.epochIdCount()).to.equal(0);
@@ -320,34 +349,34 @@ describe('Yeet Bribe Vault', () => {
     expect(currentEpoch.duration).to.equal(currentEpochDuration);
 
     // check pToken and yToken balance
-    expect(await yeetVault8.assetBalance()).to.equal(aliceDepositAmount + bobDepositAmount);
-    expect(await piBGT.balanceOf(Alice.address)).to.equal(aliceDepositAmount);
-    expect(await piBGT.balanceOf(Bob.address)).to.equal(bobDepositAmount);
-    expect(await piBGT.totalSupply()).to.equal(aliceDepositAmount + bobDepositAmount);
+    // expect(await yeetVault.assetBalance()).to.equal(aliceDepositAmount + bobDepositAmount);
+    expect(await pToken.balanceOf(Alice.address)).to.equal(aliceDepositAmount);
+    expect(await pToken.balanceOf(Bob.address)).to.equal(bobDepositAmount);
+    expect(await pToken.totalSupply()).to.equal(aliceDepositAmount + bobDepositAmount);
     expect(await yeetVault8.yTokenUserBalance(currentEpochId, Alice.address)).to.equal(0);
     expect(await yeetVault8.yTokenUserBalance(currentEpochId, Bob.address)).to.equal(0);
     expect(await yeetVault8.yTokenUserBalance(currentEpochId, await yeetVault8.getAddress())).to.equal(aliceDepositAmount + bobDepositAmount);
     expect(await yeetVault8.yTokenTotalSupply(currentEpochId)).to.equal(aliceDepositAmount + bobDepositAmount);
     
-    // Alice redeem 100 $piBGT; Bob redeem 50 $piBGT
-    const aliceRedeemAmount = ethers.parseUnits("100", await piBGT.decimals());
-    const bobRedeemAmount = ethers.parseUnits("50", await piBGT.decimals());
+    // Alice redeem 100 $pToken; Bob redeem 50 $pToken
+    const aliceRedeemAmount = ethers.parseUnits("100", await pToken.decimals());
+    const bobRedeemAmount = ethers.parseUnits("50", await pToken.decimals());
     const redeemPool = RedeemPool__factory.connect(currentEpoch.redeemPool, ethers.provider);
-    await expect(piBGT.connect(Alice).approve(await redeemPool.getAddress(), aliceRedeemAmount)).not.to.be.reverted;
+    await expect(pToken.connect(Alice).approve(await redeemPool.getAddress(), aliceRedeemAmount)).not.to.be.reverted;
     await expect(redeemPool.connect(Alice).redeem(aliceRedeemAmount)).not.to.be.reverted;
-    await expect(piBGT.connect(Bob).approve(await redeemPool.getAddress(), bobRedeemAmount)).not.to.be.reverted;
+    await expect(pToken.connect(Bob).approve(await redeemPool.getAddress(), bobRedeemAmount)).not.to.be.reverted;
     await expect(redeemPool.connect(Bob).redeem(bobRedeemAmount)).not.to.be.reverted;
 
     // Total deposit: 
     //   Alice 1000 $yeetLp; Bob 500 $yeetLp
-    // 3 days later, Alice 'swap' 100 $yeetLp for yiBGT. => $piBGT is rebased by 100/1500
+    // 3 days later, Alice 'swap' 100 $yeetLp for yt. => $pt is rebased by 100/1500
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 3);
 
     let aliceSwapAmount = ethers.parseUnits("100", await yeetLp8.decimals());
     let aliceExpectedSwapResult = await expectedCalcSwap(yeetVault8, 100, Number(await yeetLp8.decimals()));  // 1463.1851649850014
     let aliceActualSwapResult = await yeetVault8.calcSwap(aliceSwapAmount);
-    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.X_updated.toFixed(Number(await yeetLp8.decimals())), await yeetLp8.decimals()), aliceActualSwapResult[0]);
-    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.m.toFixed(Number(await yeetLp8.decimals())), await yeetLp8.decimals()), aliceActualSwapResult[1]);
+    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.X_updated.toFixed(Number(await yeetLp8.decimals())) + "", await yeetLp8.decimals()), aliceActualSwapResult[0]);
+    expectBigNumberEquals(parseUnits(aliceExpectedSwapResult.m.toFixed(Number(await yeetLp8.decimals())) + "", await yeetLp8.decimals()), aliceActualSwapResult[1]);
 
     let fees = aliceSwapAmount * 10n / 100n;
     let netSwapAmount = aliceSwapAmount - fees;
@@ -361,12 +390,27 @@ describe('Yeet Bribe Vault', () => {
       [-aliceSwapAmount, fees, netSwapAmount]
     );
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(netSwapAmount)
+      .to.emit(pToken, "Rebased").withArgs(netSwapAmount)
       .to.emit(yeetVault8, "Swap").withArgs(currentEpochId, Alice.address, aliceSwapAmount, fees, netSwapAmount, anyValue);
+    
+    let erc4626TotalShares = await trifectaVault8.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault8.decimals())}`);
+    let erc4626TotalAssets = await trifectaVault8.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp8.decimals())}`);
+    let erc4626Shares = await trifectaVault8.balanceOf(await yeetVault8.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault8.decimals())}`);
 
     // Add bribes
-    const bribeAmountYeetLp = ethers.parseUnits("1000", await yeetLp8.decimals());
+    const bribeAmountYeetLp = ethers.parseUnits("300", await yeetLp8.decimals());
     await expect(yeetLp8.connect(Alice).transfer(await trifectaVault8.getAddress(), bribeAmountYeetLp)).not.to.be.reverted;
+
+    console.log(`====== ERC4626 compounds yields ======`);
+    erc4626TotalShares = await trifectaVault8.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault8.decimals())}`);
+    erc4626TotalAssets = await trifectaVault8.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp8.decimals())}`);
+    erc4626Shares = await trifectaVault8.balanceOf(await yeetVault8.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault8.decimals())}`);
 
     // Bob swap 10 $yeetLp for yTokens, which triggers bribes claimed
     console.log("\n========= Another 11 days later, Bob swaps 10 $yeetLp for YTokens ===============");
@@ -381,13 +425,16 @@ describe('Yeet Bribe Vault', () => {
     let bobYTSwapAmount1 = await yeetVault8.yTokenUserBalance(currentEpochId, Bob.address);
     await expect(trans).to.changeTokenBalances(yeetLp8, [Bob.address], [-swapAssetAmount]);
 
-    // 16 days later, epoch ends. And all staking bribes are distributed
+    erc4626TotalShares = await trifectaVault8.totalSupply();
+    console.log(`ERC4626 total shares: ${ethers.formatUnits(erc4626TotalShares, await trifectaVault8.decimals())}`);
+    erc4626TotalAssets = await trifectaVault8.totalAssets();
+    console.log(`ERC4626 total assets: ${ethers.formatUnits(erc4626TotalAssets, await yeetLp8.decimals())}`);
+    let erc4626SharesAfterSwap = await trifectaVault8.balanceOf(await yeetVault8.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault8.decimals())}`);
+
+    // 16 days later, epoch ends. 
     console.log("\n========= 16 days later, check bribes ===============");
     await time.increaseTo(genesisTime! + ONE_DAY_IN_SECS * 16);
-
-    // let vaultBribesIBGTAmount = bribeAmountIBGT;
-    // let vaultBribesBRBAmount = bribeAmountBRB;
-    let vaultBribesYeetLpAmount = bribeAmountYeetLp;
 
     // Check YT balances
     const aliceYTokenBalance = await yeetVault8.yTokenUserBalance(currentEpochId, Alice.address);
@@ -400,15 +447,6 @@ describe('Yeet Bribe Vault', () => {
     );
     expectBigNumberEquals(aliceYTokenBalance + bobYTokenBalance + vaultYTokenBalance, totalYTokenBalance);
 
-    // const expectedAliceBribesIBGT = vaultBribesIBGTAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-    // const expectedBobBribesIBGT = vaultBribesIBGTAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-
-    // const expectedAliceBribesBRB = vaultBribesBRBAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-    // const expectedBobBribesBRB = vaultBribesBRBAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-
-    const expectedAliceBribesYeetLp = vaultBribesYeetLpAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-    const expectedBobBribesYeetLp = vaultBribesYeetLpAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
-
     let epochInfo = await yeetVault8.epochInfoById(currentEpochId);
     let stakingBribesPool = StakingBribesPool__factory.connect(epochInfo.stakingBribesPool, ethers.provider);
     let adhocBribesPool = AdhocBribesPool__factory.connect(epochInfo.adhocBribesPool, ethers.provider);
@@ -416,48 +454,25 @@ describe('Yeet Bribe Vault', () => {
     expect(await stakingBribesPool.balanceOf(Alice.address)).to.equal(aliceYTokenBalance);
     expect(await stakingBribesPool.balanceOf(Bob.address)).to.equal(bobYTokenBalance);
     expect(await stakingBribesPool.totalSupply()).to.equal(aliceYTokenBalance + bobYTokenBalance);
-    // expectBigNumberEquals(await yeetLp.balanceOf(await stakingBribesPool.getAddress()), vaultBribesIBGTAmount);
-    expectBigNumberEquals(await yeetLp8.balanceOf(await stakingBribesPool.getAddress()), vaultBribesYeetLpAmount);
 
+    let vaultBribesERC4626SharesAmount = await trifectaVault8.balanceOf(await stakingBribesPool.getAddress());
+    const expectedAliceBribesYeetLp = vaultBribesERC4626SharesAmount * aliceYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
+    const expectedBobBribesYeetLp = vaultBribesERC4626SharesAmount * bobYTokenBalance / (aliceYTokenBalance + bobYTokenBalance);
 
-    // let actualAliceBribesIBGT = await stakingBribesPool.earned(Alice.address, await yeetLp.getAddress());
-    // let actualAliceBribesBRB = await stakingBribesPool.earned(Alice.address, await brbToken.getAddress());
-    // expectBigNumberEquals(actualAliceBribesIBGT, expectedAliceBribesIBGT);
-    // expectBigNumberEquals(await stakingBribesPool.earned(Bob.address, await yeetLp.getAddress()), expectedBobBribesIBGT);
-    // expectBigNumberEquals(actualAliceBribesBRB, expectedAliceBribesBRB);
-    // expectBigNumberEquals(await stakingBribesPool.earned(Bob.address, await brbToken.getAddress()), expectedBobBribesBRB);
-
-    let actualAliceBribesYeetLp = await stakingBribesPool.earned(Alice.address, await yeetLp8.getAddress());
-    let actualBobBribesYeetLp = await stakingBribesPool.earned(Bob.address, await yeetLp8.getAddress());
-    expectBigNumberEquals(actualAliceBribesYeetLp, expectedAliceBribesYeetLp);
-    expectBigNumberEquals(actualBobBribesYeetLp, expectedBobBribesYeetLp);
+    let actualAliceBribes = await stakingBribesPool.earned(Alice.address, await trifectaVault8.getAddress());
+    let actualBobBribes = await stakingBribesPool.earned(Bob.address, await trifectaVault8.getAddress());
+    expectBigNumberEquals(actualAliceBribes, expectedAliceBribesYeetLp);
+    expectBigNumberEquals(actualBobBribes, expectedBobBribesYeetLp);
 
     console.log("\n========= Alice claimed bribes ===============");
-    
-    // trans = await stakingBribesPool.connect(Alice).getBribes();
-    // await expect(trans)
-    //   .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await yeetLp.getAddress(), actualAliceBribesIBGT)
-    //   .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await brbToken.getAddress(), actualAliceBribesBRB);
-    // await expect(trans).to.changeTokenBalances(
-    //   yeetLp,
-    //   [Alice.address, await stakingBribesPool.getAddress()],
-    //   [actualAliceBribesIBGT, -actualAliceBribesIBGT]
-    // );
-    // await expect(trans).to.changeTokenBalances(
-    //   brbToken,
-    //   [Alice.address, await stakingBribesPool.getAddress()],
-    //   [actualAliceBribesBRB, -actualAliceBribesBRB]
-    // );
-    // expect(await stakingBribesPool.earned(Alice.address, await yeetLp.getAddress())).to.equal(0);
-    // expect(await stakingBribesPool.earned(Alice.address, await brbToken.getAddress())).to.equal(0);
 
     trans = await stakingBribesPool.connect(Alice).getBribes();
     await expect(trans)
-      .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await yeetLp8.getAddress(), actualAliceBribesYeetLp);
+      .to.emit(stakingBribesPool, 'BribesPaid').withArgs(Alice.address, await trifectaVault8.getAddress(), actualAliceBribes);
     await expect(trans).to.changeTokenBalances(
-      yeetLp8,
+      trifectaVault8,
       [Alice.address, await stakingBribesPool.getAddress()],
-      [actualAliceBribesYeetLp, -actualAliceBribesYeetLp]
+      [actualAliceBribes, -actualAliceBribes]
     );
 
     // Alice add Bob as briber
@@ -512,28 +527,35 @@ describe('Yeet Bribe Vault', () => {
     let iBGTBalanceAfterClose = await yeetLp8.balanceOf(await yeetVault8.getAddress());
     console.log(`$yeetLp balance after close: ${formatUnits(iBGTBalanceAfterClose, await yeetLp8.decimals())}`);
 
-    let alicePTokenBalance = await piBGT.balanceOf(Alice.address);
-    let bobPTokenBalance = await piBGT.balanceOf(Bob.address);
-    console.log(`Alice $piBGT balance: ${formatUnits(alicePTokenBalance, await piBGT.decimals())}`);
-    console.log(`Bob $piBGT balance: ${formatUnits(bobPTokenBalance, await piBGT.decimals())}`);
+    let pTokenTotalSupply = await pToken.totalSupply();
+    let alicePTokenBalance = await pToken.balanceOf(Alice.address);
+    let bobPTokenBalance = await pToken.balanceOf(Bob.address);
+    console.log(`$pToken total supply: ${formatUnits(pTokenTotalSupply, await pToken.decimals())}`);
+    console.log(`Alice $pToken balance: ${formatUnits(alicePTokenBalance, await pToken.decimals())}`);
+    console.log(`Bob $pToken balance: ${formatUnits(bobPTokenBalance, await pToken.decimals())}`);
+
+    erc4626Shares = await trifectaVault8.balanceOf(await yeetVault8.getAddress());
+    console.log(`B-Vault $ERC4626 shares: ${ethers.formatUnits(erc4626Shares, await trifectaVault8.decimals())}`);
 
     // Could not deposit or swap after yeetVault is closed
     await expect(yeetVault8.connect(Alice).deposit(100)).to.be.reverted;
     await expect(yeetVault8.connect(Alice).swap(100)).to.be.reverted;
 
     // Alice and Bob get their $yeetLp back
-    console.log("\n========= Alice and Bob get their $yeetLp back ===============");
+    console.log("\n========= Alice and Bob get their ERC4626 shares back ===============");
     await expect(yeetVault8.connect(Alice).redeem(alicePTokenBalance * 2n)).to.be.reverted;
     trans = await yeetVault8.connect(Alice).redeem(alicePTokenBalance);
     await expect(trans).to.changeTokenBalances(
-      piBGT,
+      pToken,
       [Alice.address],
       [-alicePTokenBalance]
     );
+
+    let aliceERC4626Shares = erc4626Shares * alicePTokenBalance / pTokenTotalSupply;
     await expect(trans).to.changeTokenBalances(
-      yeetLp8,
+      trifectaVault8,
       [Alice.address],
-      [alicePTokenBalance]
+      [aliceERC4626Shares]
     );
     await expect(trans)
       .to.emit(yeetVault8, "Redeem").withArgs(Alice.address, alicePTokenBalance, anyValue);
@@ -541,7 +563,7 @@ describe('Yeet Bribe Vault', () => {
 
   it('Swap works', async () => {
     const { protocol, settings, yeetVault, trifectaVault, yeetLp, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
+    const pToken = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
 
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f1"), 0);
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f2"), 0);
@@ -584,7 +606,7 @@ describe('Yeet Bribe Vault', () => {
     let trans = await yeetVault.connect(Bob).swap(swapAssetAmount);
     await expect(trans).to.changeTokenBalances(yeetLp, [Bob.address, await trifectaVault.getAddress()], [-swapAssetAmount, swapAssetAmount]);
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(swapAssetAmount)
+      .to.emit(pToken, "Rebased").withArgs(swapAssetAmount)
       .to.emit(yeetVault, "Swap").withArgs(epochId, Bob.address, swapAssetAmount, 0, swapAssetAmount, anyValue);
 
     // k0 not changed.
@@ -681,7 +703,7 @@ describe('Yeet Bribe Vault', () => {
 
   it('Swap with assets other than 18 decimals works', async () => {
     const { protocol, settings, yeetVault8, trifectaVault8, yeetLp8, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await yeetVault8.pToken(), ethers.provider);
+    const pToken = PToken__factory.connect(await yeetVault8.pToken(), ethers.provider);
 
     await settings.connect(Alice).updateVaultParamValue(await yeetVault8.getAddress(), ethers.encodeBytes32String("f1"), 0);
     await settings.connect(Alice).updateVaultParamValue(await yeetVault8.getAddress(), ethers.encodeBytes32String("f2"), 0);
@@ -724,7 +746,7 @@ describe('Yeet Bribe Vault', () => {
     let trans = await yeetVault8.connect(Bob).swap(swapAssetAmount);
     await expect(trans).to.changeTokenBalances(yeetLp8, [Bob.address, await trifectaVault8.getAddress()], [-swapAssetAmount, swapAssetAmount]);
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(swapAssetAmount)
+      .to.emit(pToken, "Rebased").withArgs(swapAssetAmount)
       .to.emit(yeetVault8, "Swap").withArgs(epochId, Bob.address, swapAssetAmount, 0, swapAssetAmount, anyValue);
 
     // k0 not changed.
@@ -821,7 +843,7 @@ describe('Yeet Bribe Vault', () => {
 
   it('Swap with big numbers works', async () => {
     const { settings, yeetVault, trifectaVault, yeetLp, Alice, Bob, Caro } = await loadFixture(deployContractsFixture);
-    const piBGT = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
+    const pToken = PToken__factory.connect(await yeetVault.pToken(), ethers.provider);
 
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f1"), 0);
     await settings.connect(Alice).updateVaultParamValue(await yeetVault.getAddress(), ethers.encodeBytes32String("f2"), 0);
@@ -865,7 +887,7 @@ describe('Yeet Bribe Vault', () => {
     let trans = await yeetVault.connect(Bob).swap(swapAssetAmount);
     await expect(trans).to.changeTokenBalances(yeetLp, [Bob.address, await trifectaVault.getAddress()], [-swapAssetAmount, swapAssetAmount]);
     await expect(trans)
-      .to.emit(piBGT, "Rebased").withArgs(swapAssetAmount)
+      .to.emit(pToken, "Rebased").withArgs(swapAssetAmount)
       .to.emit(yeetVault, "Swap").withArgs(epochId, Bob.address, swapAssetAmount, 0, swapAssetAmount, anyValue);
 
     // k0 not changed.

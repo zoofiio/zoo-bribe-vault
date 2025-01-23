@@ -64,8 +64,8 @@
       "pHONEY-WBER"
     ]
   },
-  "YeetBribeVault": {
-    "address": "0x12f5F1f53B419d1E5F3084E649001Ff091683ADc",
+  "ERC4626BribeVault": {
+    "address": "0x6A2A4d8Fe425dC783e67b90d88922c5890BfA78c",
     "args": [
       "0xF86a9a53D963B7a845F3496a97d0dB11cEc3c4E0",
       "0x97d82C639835F4EfaCC366fdE78CA0c4EC2a2A83",
