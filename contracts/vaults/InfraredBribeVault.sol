@@ -22,7 +22,7 @@ contract InfraredBribeVault is Vault {
     require(_stakingPool_ != address(0), "Zero address detected");
     
     stakingPool = IStakingPool(_stakingPool_);
-    _assetToken.approve(address(stakingPool), type(uint256).max);
+    IERC20(assetToken).approve(address(stakingPool), type(uint256).max);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
@@ -38,9 +38,9 @@ contract InfraredBribeVault is Vault {
   function _settleRedeemPool(IRedeemPool redeemPool) internal override {
     uint256 amount = redeemPool.totalRedeemingBalance();
     if (amount > 0) {
-      IPToken(_pToken).burn(address(redeemPool), amount);
+      IPToken(pToken).burn(address(redeemPool), amount);
       stakingPool.withdraw(amount);
-      TokensTransfer.transferTokens(address(_assetToken), address(this), address(redeemPool), amount);
+      TokensTransfer.transferTokens(assetToken, address(this), address(redeemPool), amount);
     }
 
     redeemPool.notifySettlement(amount);
@@ -57,15 +57,17 @@ contract InfraredBribeVault is Vault {
     }
 
     address[] memory rewardTokens = new address[](rewardTokensCount);
+    uint256[] memory prevBalances = new uint256[](rewardTokensCount);
     for (uint256 i = 0; i < rewardTokens.length; i++) {
       rewardTokens[i] = stakingPool.rewardTokens(i);
+      prevBalances[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
     }
 
     stakingPool.getReward();
 
     for (uint256 i = 0; i < rewardTokens.length; i++) {
       address bribeToken = rewardTokens[i];
-      uint256 allBribes = IERC20(bribeToken).balanceOf(address(this));
+      uint256 allBribes = IERC20(bribeToken).balanceOf(address(this)) - prevBalances[i];
 
       // Add bribes to bribes pool
       if (allBribes > 0) {
@@ -82,8 +84,8 @@ contract InfraredBribeVault is Vault {
   }
 
   function _redeemOnClose(uint256 ptAmount) internal override {
-    IPToken(_pToken).burn(_msgSender(), ptAmount);
-    TokensTransfer.transferTokens(address(_assetToken), address(this), _msgSender(), ptAmount);
+    IPToken(pToken).burn(_msgSender(), ptAmount);
+    TokensTransfer.transferTokens(assetToken, address(this), _msgSender(), ptAmount);
   }
 
 }

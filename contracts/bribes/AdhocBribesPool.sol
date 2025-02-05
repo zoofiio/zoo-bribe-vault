@@ -51,7 +51,11 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
   function collectableYT(address user) public view returns (uint256, uint256) {
     uint256 ytCollectTimestamp = ytCollectTimestampApplicable();
-    uint256 deltaTime = ytCollectTimestamp - ytLastCollectTime[user];
+    uint256 deltaTime = 0;
+    if (ytCollectTimestamp > ytLastCollectTime[user]) {
+      deltaTime = ytCollectTimestamp - ytLastCollectTime[user];
+    }
+
     uint256 deltaTimeWeightedYTAmount = ytSum[user] * deltaTime;
     return (ytCollectTimestamp, deltaTimeWeightedYTAmount);
   }

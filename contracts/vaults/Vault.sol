@@ -37,8 +37,8 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   IRedeemPoolFactory public redeemPoolFactory;
   IBribesPoolFactory public bribesPoolFactory;
 
-  IERC20 internal immutable _assetToken;
-  IPToken internal immutable _pToken;
+  address public immutable assetToken;
+  address public immutable pToken;
   uint8 public immutable ytDecimals;
 
   Counters.Counter internal _currentEpochId;  // default to 0
@@ -59,23 +59,22 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     address _redeemPoolFactory,
     address _bribesPoolFactory,
     address _assetToken_,
-    string memory _pTokenName, string memory _pTokensymbol
+    string memory _pTokenName, string memory _pTokenSymbol
   ) ProtocolOwner(_protocol) {
     require(
       _settings != address(0) && _redeemPoolFactory != address(0) && _bribesPoolFactory != address(0) && _assetToken_ != address(0),
       "Zero address detected"
     );
     require(_assetToken_ != Constants.NATIVE_TOKEN);
-    require(IERC20Metadata(_assetToken_).decimals() <= 18);
+    uint8 assetDecimals = IERC20Metadata(_assetToken_).decimals();
 
     settings = _settings;
     redeemPoolFactory = IRedeemPoolFactory(_redeemPoolFactory);
     bribesPoolFactory = IBribesPoolFactory(_bribesPoolFactory);
 
-    _assetToken = IERC20(_assetToken_);
+    assetToken = _assetToken_;
     // PToken's decimals should be the same as the asset token's decimals
-    uint8 assetDecimals = IERC20Metadata(_assetToken_).decimals();
-    _pToken = new PToken(_protocol, _settings, _pTokenName, _pTokensymbol, assetDecimals);
+    pToken = address(new PToken(_protocol, _settings, _pTokenName, _pTokenSymbol, assetDecimals));
     ytDecimals = assetDecimals;
   }
 
@@ -87,14 +86,6 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   function assetBalance() public view override whenNotClosed returns (uint256) {
     return _balanceOfUnderlyingVault();
-  }
-
-  function assetToken() public view override returns (address) {
-    return address(_assetToken);
-  }
-
-  function pToken() public view override returns (address) {
-    return address(_pToken);
   }
 
   function currentEpochId() public view returns (uint256) {
@@ -149,16 +140,16 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   /* ========== MUTATIVE FUNCTIONS ========== */
 
   function deposit(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) {
-    require(amount <= _assetToken.balanceOf(_msgSender()));
+    require(amount <= IERC20(assetToken).balanceOf(_msgSender()));
 
     bool newEpoch = _onUserAction(amount);
 
-    TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), amount);
     _depositToUnderlyingVault(amount);
 
     // mint pToken to user
     uint256 pTokenAmount = amount;
-    uint256 pTokenSharesAmount = IPToken(_pToken).mint(_msgSender(), pTokenAmount);
+    uint256 pTokenSharesAmount = IPToken(pToken).mint(_msgSender(), pTokenAmount);
     emit PTokenMinted(_msgSender(), amount, pTokenAmount, pTokenSharesAmount);
 
     uint256 yTokenAmount = amount;
@@ -181,16 +172,16 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   }
 
   function redeem(uint256 amount) external nonReentrant whenClosed noneZeroAmount(amount) {
-    require(amount <= IPToken(_pToken).balanceOf(_msgSender()));
-    uint256 sharesAmount = IPToken(_pToken).getSharesByBalance(amount);
+    require(amount <= IPToken(pToken).balanceOf(_msgSender()));
+    uint256 sharesAmount = IPToken(pToken).getSharesByBalance(amount);
 
     _redeemOnClose(amount);
     emit Redeem(_msgSender(), amount, sharesAmount);
   }
 
   function swap(uint256 amount) external nonReentrant whenNotPaused whenNotClosed noneZeroAmount(amount) {
-    require(IERC20(_pToken).totalSupply() > 0, "No principal tokens");
-    require(amount <= _assetToken.balanceOf(_msgSender()));
+    require(IERC20(pToken).totalSupply() > 0, "No principal tokens");
+    require(amount <= IERC20(assetToken).balanceOf(_msgSender()));
 
     _onUserAction(0);
 
@@ -198,17 +189,17 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
     require(block.timestamp <= epoch.startTime + epoch.duration, "Epoch ended");
 
-    TokensTransfer.transferTokens(address(_assetToken), _msgSender(), address(this), amount);
+    TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), amount);
 
     uint256 fees = amount * paramValue("f2") / (10 ** IProtocolSettings(settings).decimals());
     if (fees > 0) {
-      TokensTransfer.transferTokens(address(_assetToken), address(this), IProtocolSettings(settings).treasury(), fees);
+      TokensTransfer.transferTokens(assetToken, address(this), IProtocolSettings(settings).treasury(), fees);
     }
     uint256 netAmount = amount - fees;
     _depositToUnderlyingVault(netAmount);
 
     uint256 pTokenAmount = netAmount;
-    IPToken(_pToken).rebase(pTokenAmount);
+    IPToken(pToken).rebase(pTokenAmount);
 
     _assetTotalSwapAmount[_currentEpochId.current()] = _assetTotalSwapAmount[_currentEpochId.current()] + netAmount;
 
@@ -351,7 +342,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     emit EpochStarted(epochId, block.timestamp, paramValue("D"), _epochs[epochId].redeemPool, _epochs[epochId].stakingBribesPool, _epochs[epochId].adhocBribesPool);
 
     if (oldEpochId > 0) {
-      uint256 yTokenAmount = IERC20(_pToken).totalSupply();
+      uint256 yTokenAmount = IERC20(pToken).totalSupply();
       _yTokenTotalSupply[epochId] = yTokenAmount;
       _yTokenUserBalances[epochId][address(this)] = yTokenAmount;
     }

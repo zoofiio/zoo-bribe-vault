@@ -4,7 +4,6 @@ pragma solidity ^0.8.18;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../interfaces/IProtocolSettings.sol";
 import "../interfaces/IPToken.sol";
@@ -13,7 +12,6 @@ import "../settings/ProtocolOwner.sol";
 
 contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   using Math for uint256;
-  using SafeMath for uint256;
 
   uint256 constant internal INFINITE_ALLOWANCE = type(uint256).max;
 
@@ -111,14 +109,14 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   }
 
   function increaseAllowance(address spender, uint256 addedValue) external nonReentrant returns (bool) {
-    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
+    _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
     return true;
   }
 
   function decreaseAllowance(address spender, uint256 subtractedValue) external nonReentrant returns (bool) {
     uint256 currentAllowance = _allowances[_msgSender()][spender];
     require(currentAllowance >= subtractedValue, "Allowance below zero");
-    _approve(_msgSender(), spender, currentAllowance.sub(subtractedValue));
+    _approve(_msgSender(), spender, currentAllowance - subtractedValue);
     return true;
   }
 
@@ -140,7 +138,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
     uint256 sharesAmount = getSharesByBalance(amount);
     _mintShares(to, sharesAmount);
-    _totalSupply = _totalSupply.add(amount);
+    _totalSupply = _totalSupply + amount;
 
     _emitTransferEvents(address(0), to, amount, sharesAmount);
 
@@ -149,7 +147,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   function rebase(uint256 addedSupply) external nonReentrant onlyVault {
     require(addedSupply > 0, 'Amount too small');
-    _totalSupply = _totalSupply.add(addedSupply);
+    _totalSupply = _totalSupply + addedSupply;
     emit Rebased(addedSupply);
   }
 
@@ -159,7 +157,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
     uint256 sharesAmount = getSharesByBalance(amount);
     _burnShares(account, sharesAmount);
-    _totalSupply = _totalSupply.sub(amount);
+    _totalSupply = _totalSupply - amount;
 
     _emitTransferEvents(account, address(0), amount, sharesAmount);
 
@@ -213,26 +211,26 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     uint256 currentSenderShares = _shares[from];
     require(sharesAmount <= currentSenderShares, "Balance exceeded");
 
-    _shares[from] = currentSenderShares.sub(sharesAmount);
-    _shares[to] = _shares[to].add(sharesAmount);
+    _shares[from] = currentSenderShares - sharesAmount;
+    _shares[to] = _shares[to] + sharesAmount;
   }
 
-  function _mintShares(address to, uint256 sharesAmount) internal returns (uint256 newTotalShares) {
+  function _mintShares(address to, uint256 sharesAmount) internal returns (uint256) {
     require(to != address(0), "Mint to zero address");
 
-    _totalShares = _totalShares.add(sharesAmount);
-    _shares[to] = _shares[to].add(sharesAmount);
+    _totalShares = _totalShares + sharesAmount;
+    _shares[to] = _shares[to] + sharesAmount;
 
     return _totalShares;
   }
 
-  function _burnShares(address account, uint256 sharesAmount) internal returns (uint256 newTotalShares) {
+  function _burnShares(address account, uint256 sharesAmount) internal returns (uint256) {
     require(account != address(0), "Burn from zero address");
 
     require(sharesAmount <= _shares[account], "Balance exceeded");
 
-    _totalShares = _totalShares.sub(sharesAmount);
-    _shares[account] = _shares[account].sub(sharesAmount);
+    _totalShares = _totalShares - sharesAmount;
+    _shares[account] = _shares[account] - sharesAmount;
 
     return _totalShares;
   }

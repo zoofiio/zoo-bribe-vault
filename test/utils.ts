@@ -58,6 +58,9 @@ export async function deployContractsFixture() {
   const iBGT8Token = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT8 Token", "iBGT8", 8);
   const iBGT8 = MockERC20__factory.connect(await iBGT8Token.getAddress(), provider);
 
+  const iBGT28Token = await MockERC20Factory.deploy(await protocol.getAddress(), "iBGT28 Token", "iBGT28", 28);
+  const iBGT28 = MockERC20__factory.connect(await iBGT28Token.getAddress(), provider);
+
   const MockRebasableERC20Factory = await ethers.getContractFactory("MockRebasableERC20");
   const MockRebasableERC20 = await MockRebasableERC20Factory.deploy(await protocol.getAddress(),"Liquid staked Ether 2.0", "stETH");
   const stETH = MockRebasableERC20__factory.connect(await MockRebasableERC20.getAddress(), provider);
@@ -100,6 +103,20 @@ export async function deployContractsFixture() {
   );
   const vault8 = Vault__factory.connect(await iBGT8VaultContract.getAddress(), provider);
   trans = await protocol.connect(Alice).addVault(await vault8.getAddress());
+  await trans.wait();
+
+  const MockStakingPool28 = await MockStakingPoolFactory.deploy(await protocol.getAddress(), await iBGT28.getAddress());
+  const stakingPool28 = MockStakingPool__factory.connect(await MockStakingPool28.getAddress(), provider);
+
+  const iBGT28VaultContract = await InfraredBribeVaultFactory.deploy(
+    await protocol.getAddress(), await settings.getAddress(),
+    await redeemPoolFactory.getAddress(),
+    await bribesPoolFactory.getAddress(),
+    await stakingPool28.getAddress(),
+    await iBGT28.getAddress(), "Zoo piBGT28", "piBGT28"
+  );
+  const vault28 = Vault__factory.connect(await iBGT28VaultContract.getAddress(), provider);
+  trans = await protocol.connect(Alice).addVault(await vault28.getAddress());
   await trans.wait();
 
   const yeetLpToken = await MockERC20Factory.deploy(await protocol.getAddress(), "WBEAR-YEET Token", "WBEAR-YEET", 18);
@@ -147,7 +164,8 @@ export async function deployContractsFixture() {
   return { 
     Alice, Bob, Caro, Dave, Ivy,
     protocol, settings, redeemPoolFactory, bribesPoolFactory, stakingPool, stakingPool8,
-    iBGT, iBGT8, stETH, vaultCalculator, vault, vault8, yeetLp, yeetLp8, trifectaVault, trifectaVault8, yeetVault, yeetVault8
+    iBGT, iBGT8, iBGT28, stETH, vaultCalculator, vault, vault8, vault28, stakingPool28,
+    yeetLp, yeetLp8, trifectaVault, trifectaVault8, yeetVault, yeetVault8
   };
 }
 

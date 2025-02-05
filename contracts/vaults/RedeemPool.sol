@@ -129,7 +129,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
   }
 
   // $iBGT
-  function claimAssetToken() public {
+  function claimAssetToken() external {
     _claimAssetToken(_msgSender());
   }
 
@@ -142,7 +142,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
       withdrawRedeem(userRedeemingBalance(_msgSender()));
     }
     else {
-      claimAssetToken();
+      _claimAssetToken(_msgSender());
     }
   }
 

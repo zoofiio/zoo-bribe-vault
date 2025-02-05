@@ -131,7 +131,8 @@ config.networks = {
     chainId: 1337,
     gas: "auto",
     gasPrice: "auto",
-    allowUnlimitedContractSize: true,
+    allowUnlimitedContractSize: false,
+    // loggingEnabled: true,
   },
 };
 

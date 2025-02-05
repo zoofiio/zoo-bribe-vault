@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import "./Vault.sol";
@@ -23,7 +23,7 @@ contract ERC4626BribeVault is Vault {
     require(_erc4626 != address(0), "Zero address detected");
     
     erc4626 = IERC4626(_erc4626);
-    _assetToken.approve(address(erc4626), type(uint256).max);
+    IERC20(assetToken).approve(address(erc4626), type(uint256).max);
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
@@ -41,7 +41,7 @@ contract ERC4626BribeVault is Vault {
     uint256 ptAmount = redeemPool.totalRedeemingBalance();
     uint256 sharesAmount = 0;
     if (ptAmount > 0) {
-      IPToken(_pToken).burn(address(redeemPool), ptAmount);
+      IPToken(pToken).burn(address(redeemPool), ptAmount);
       sharesAmount = erc4626.convertToShares(ptAmount);
       TokensTransfer.transferTokens(address(erc4626), address(this), address(redeemPool), sharesAmount);
     }
@@ -53,13 +53,13 @@ contract ERC4626BribeVault is Vault {
   }
 
   function _doUpdateStakingBribes(IBribesPool stakingBribesPool) internal override {
-    uint256 principalAssetAmount = _pToken.totalSupply();
+    uint256 principalAssetAmount = IERC20(pToken).totalSupply();
     uint256 principalShares = erc4626.convertToShares(principalAssetAmount);
     uint256 totalShares = erc4626.balanceOf(address(this));
-    console.log(
-      "_doUpdateStakingBribes, $PT total supply: %s, to ERC4626 shares: %s, B-Vault $ERC4626 shares: %s", 
-      principalAssetAmount, principalShares, totalShares
-    );
+    // console.log(
+    //   "_doUpdateStakingBribes, $PT total supply: %s, to ERC4626 shares: %s, B-Vault $ERC4626 shares: %s", 
+    //   principalAssetAmount, principalShares, totalShares
+    // );
 
     if (totalShares > principalShares) {
       uint256 yields = totalShares - principalShares;
@@ -69,11 +69,11 @@ contract ERC4626BribeVault is Vault {
   }
 
   function _redeemOnClose(uint256 ptAmount) internal override {
-    uint256 ptTotalSupply = _pToken.totalSupply();
+    uint256 ptTotalSupply = IERC20(pToken).totalSupply();
     uint256 totalShares = erc4626.balanceOf(address(this));
     uint256 shares = ptAmount.mulDiv(totalShares, ptTotalSupply);
 
-    IPToken(_pToken).burn(_msgSender(), ptAmount);
+    IPToken(pToken).burn(_msgSender(), ptAmount);
     if (shares > 0) {
       TokensTransfer.transferTokens(address(erc4626), address(this), _msgSender(), shares);
     }
