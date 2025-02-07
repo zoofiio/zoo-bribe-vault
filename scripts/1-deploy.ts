@@ -7,11 +7,11 @@ import { MockERC20__factory, ProtocolSettings__factory, ZooProtocol__factory, Va
 
 dotenv.config();
 
-const treasuryAddress = "0xC73ce0c5e473E68058298D9163296BebAC2b729C";
+const treasuryAddress = "0x54c56e149f6d655aa784678057d1f96612b0cf1a";
 
 let deployer: SignerWithAddress;
 
-const testers: any[] = ["0x956Cd653e87269b5984B8e1D2884E1C0b1b94442", "0xc97B447186c59A5Bb905cb193f15fC802eF3D543", "0x1851CbB368C7c49B997064086dA94dBAD90eB9b5"];
+// const testers: any[] = ["0x956Cd653e87269b5984B8e1D2884E1C0b1b94442", "0xc97B447186c59A5Bb905cb193f15fC802eF3D543", "0x1851CbB368C7c49B997064086dA94dBAD90eB9b5"];
 
 async function main() {
   const signers = await ethers.getSigners();
@@ -24,6 +24,7 @@ async function main() {
 
   const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
   const settings = ProtocolSettings__factory.connect(protocolSettingsAddress, deployer);
+
   // add Vault to protocol
   async function addVault(vault: string) {
     const isVault = await protocol.connect(deployer).isVault(vault);
@@ -33,16 +34,16 @@ async function main() {
   }
 
   // Deploy mocked iRED
-  const iREDAddress = await deployContract("MockERC20", [protocolAddress, "Mocked iRED Token", "iRED"]);
-  const iRED = MockERC20__factory.connect(iREDAddress, deployer);
-  for (let i = 0; i < _.size(testers); i++) {
-    const isTester = iRED.connect(deployer).isTester(testers[i]);
-    if (!isTester) {
-      const trans = await iRED.connect(deployer).setTester(testers[i], true);
-      await trans.wait();
-    }
-    console.log(`${await iRED.symbol()}: ${testers[i]} is now a tester`);
-  }
+  // const iREDAddress = await deployContract("MockERC20", [protocolAddress, "Mocked iRED Token", "iRED"]);
+  // const iRED = MockERC20__factory.connect(iREDAddress, deployer);
+  // for (let i = 0; i < _.size(testers); i++) {
+  //   const isTester = iRED.connect(deployer).isTester(testers[i]);
+  //   if (!isTester) {
+  //     const trans = await iRED.connect(deployer).setTester(testers[i], true);
+  //     await trans.wait();
+  //   }
+  //   console.log(`${await iRED.symbol()}: ${testers[i]} is now a tester`);
+  // }
 
   // Deploy mocked iRED staking pool
   // const stakingPoolAddress = await deployContract("MockStakingPool", [protocolAddress, iREDAddress]);
@@ -54,9 +55,9 @@ async function main() {
 
   const deployVault = async (asset: string, pool: string, name: string, index: number = 1) => {
     const vaultAddress = await deployContract(
-      "Vault",
+      "InfraredBribeVault",
       [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, bribesPoolFactoryAddress, pool, asset, `Zoo p${name}`, `p${name.slice(0, 10)}`],
-      `${name}_${index}_Vault`,
+      `${name}_${index}_Vault}`,
       {
         libraries: {
           VaultCalculator: vaultCalculatorAddress,
@@ -84,6 +85,9 @@ async function main() {
     console.log(`Added ERC4626BribeVault to protocol`);
   };
 
+  // HONEY-USDC.e
+  await deployVault("0xf961a8f6d8c69e7321e78d254ecafbcc3a637621", "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2", "HONEY-USDC.e", 1);
+
   // Deploy $HONEY-USDC-LP vault
   // await deployVault("0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96", "0x675547750F4acdf64eD72e9426293f38d8138CA8", "HONEY-USDC-LP", 1);
   
@@ -91,7 +95,7 @@ async function main() {
   // await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 1);
   // await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 2);
 
-  await deployYeetVault("0x0001513F4a1f86da0f02e647609E9E2c630B3a14", "0x208008F377Ad00ac07A646A1c3eA6b70eB9Fc511", "Zoo pBERAYEET", "pBERAYEET");
+  // await deployYeetVault("0x0001513F4a1f86da0f02e647609E9E2c630B3a14", "0x208008F377Ad00ac07A646A1c3eA6b70eB9Fc511", "Zoo pBERAYEET", "pBERAYEET");
 }
 
 // We recommend this pattern to be able to use async/await everywhere

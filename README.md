@@ -15,11 +15,11 @@ $ hh compile
 With same keys to `.env-example`
 
 ```sh
-$ hh run scripts/1-deploy.ts --network <mainnet/sepolia/bera-bartio>
+$ hh run scripts/1-deploy.ts --network <mainnet/sepolia/bera/bera-bartio>
 
 # Etherscan verify
 $ hh clean
-$ yarn verify <mainnet/sepolia/bera-bartio>
+$ yarn verify <mainnet/sepolia/bera/bera-bartio>
 ```
 
 ### Run Test Cases

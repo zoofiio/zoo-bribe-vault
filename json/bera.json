@@ -1,0 +1,42 @@
+{
+  "ZooProtocol": {
+    "address": "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
+    "args": []
+  },
+  "ProtocolSettings": {
+    "address": "0x2f70e725553c8E3341e46CAa4e9B303E9d810fC9",
+    "args": [
+      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
+      "0x54c56e149f6d655aa784678057d1f96612b0cf1a"
+    ]
+  },
+  "VaultCalculator": {
+    "address": "0x8d50571796c86fd7018b5711A10a498eEAf5761f",
+    "args": []
+  },
+  "RedeemPoolFactory": {
+    "address": "0xa341E92B22B1A2c94b24163eAE09AED34E8Ea134",
+    "args": [
+      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8"
+    ]
+  },
+  "BribesPoolFactory": {
+    "address": "0x056e530679857DBd884f7A9bd71E6B8a76909181",
+    "args": [
+      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8"
+    ]
+  },
+  "HONEY-USDC.e_1_Vault}": {
+    "address": "0xeb407254F0962De56d7984B41b12974f0EE44342",
+    "args": [
+      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
+      "0x2f70e725553c8E3341e46CAa4e9B303E9d810fC9",
+      "0xa341E92B22B1A2c94b24163eAE09AED34E8Ea134",
+      "0x056e530679857DBd884f7A9bd71E6B8a76909181",
+      "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2",
+      "0xf961a8f6d8c69e7321e78d254ecafbcc3a637621",
+      "Zoo pHONEY-USDC.e",
+      "pHONEY-USDC"
+    ]
+  }
+}

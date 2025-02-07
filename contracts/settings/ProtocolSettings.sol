@@ -30,8 +30,8 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
   constructor(address _protocol_, address _treasury_) ProtocolOwner(_protocol_) {
     _treasury = _treasury_;
 
-    // Epoch duration. Default to 15 days, [1 hour, 5 year]
-    _upsertParamConfig("D", 15 days, 1 hours, 1825 days);
+    // Epoch duration. Default to 30 days, [1 hour, 5 year]
+    _upsertParamConfig("D", 30 days, 1 hours, 1825 days);
     // Initial APR. Default to 200%, [1%, 1000%]
     _upsertParamConfig("APRi", 2 * 10 ** 10, 10 ** 8, 10 ** 11);
 

@@ -4,20 +4,19 @@ import { IInfrared__factory } from "../typechain";
 async function main() {
   const [deployer] = await ethers.getSigners();
 
-  // https://infrared.finance/docs/testnet/deployments
-  const infraredAddress = "0xe41779952f5485db5440452DFa43350556AA4673";
+  // https://infrared.finance/docs/developers/contract-deployments
+  const infraredAddress = "0xb71b3DaEA39012Fb0f2B14D2a9C86da9292fC126";
 
   // https://infrared.finance/docs/developers/smart-contract-apis/infrared
   const infrared = IInfrared__factory.connect(infraredAddress, deployer);
 
-  // https://bartio.bex.berachain.com/pool/0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7
-  const lpHoneyWbera = "0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7";
+  const lp = "0xf961a8f6d8c69e7321e78d254ecafbcc3a637621";
 
-  // On bera-bartio, should output: 0x5c5f9a838747fb83678ECe15D85005FD4F558237
+  // On bera-bartio, should output: 0x59945c5be54ff1d8deb0e8bc7f132f950da910a2
   // Which matches https://infrared.finance/docs/testnet/deployments
-  const vaultHoneyWbera = await infrared.vaultRegistry(lpHoneyWbera);
+  const vault = await infrared.vaultRegistry(lp);
 
-  console.info("vaultHoneyWbera", vaultHoneyWbera);
+  console.info("infrared vault: ", vault);
 }
 
 main().catch((error) => {
