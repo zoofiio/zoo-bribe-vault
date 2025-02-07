@@ -1,38 +1,52 @@
 {
   "ZooProtocol": {
-    "address": "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
+    "address": "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
     "args": []
   },
   "ProtocolSettings": {
-    "address": "0x2f70e725553c8E3341e46CAa4e9B303E9d810fC9",
+    "address": "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB",
     "args": [
-      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
       "0x54c56e149f6d655aa784678057d1f96612b0cf1a"
     ]
   },
   "VaultCalculator": {
-    "address": "0x8d50571796c86fd7018b5711A10a498eEAf5761f",
+    "address": "0x38d913835FA8115B60665d902F05b0Cd772377Fe",
     "args": []
   },
   "RedeemPoolFactory": {
-    "address": "0xa341E92B22B1A2c94b24163eAE09AED34E8Ea134",
+    "address": "0xF6F4a88ffD26fb14da4cFf997Ca773b06E3b2db3",
     "args": [
-      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8"
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc"
     ]
   },
   "BribesPoolFactory": {
-    "address": "0x056e530679857DBd884f7A9bd71E6B8a76909181",
+    "address": "0x550b031acbc56B309A8ef28914959115f6a97202",
     "args": [
-      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8"
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc"
     ]
   },
-  "HONEY-USDC.e_1_Vault}": {
-    "address": "0xeb407254F0962De56d7984B41b12974f0EE44342",
+  "BQuery": {
+    "address": "0x6E603014ACE3Ae06F34Ffe259106Af77c056d913",
+    "args": []
+  },
+  "PToken": {
+    "address": "0x70B851f6877D16D6D5aD546B17d06281b8aBDd4b",
     "args": [
-      "0x170e0C91ffa71dc3c16d43f754b3AECe688470c8",
-      "0x2f70e725553c8E3341e46CAa4e9B303E9d810fC9",
-      "0xa341E92B22B1A2c94b24163eAE09AED34E8Ea134",
-      "0x056e530679857DBd884f7A9bd71E6B8a76909181",
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
+      "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB",
+      "Zoo pHONEY-USDC.e",
+      "pHONEY-USDC",
+      18
+    ]
+  },
+  "HONEY-USDC.e_Vault": {
+    "address": "0x33C42E171cFD7Ec85D3dB34D7f6d3D8121f64E63",
+    "args": [
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
+      "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB",
+      "0xF6F4a88ffD26fb14da4cFf997Ca773b06E3b2db3",
+      "0x550b031acbc56B309A8ef28914959115f6a97202",
       "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2",
       "0xf961a8f6d8c69e7321e78d254ecafbcc3a637621",
       "Zoo pHONEY-USDC.e",

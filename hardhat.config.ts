@@ -64,9 +64,9 @@ const config: HardhatUserConfig = {
       {
         version: "0.8.18",
         settings: {
-          metadata: {
-            bytecodeHash: "ipfs",
-          },
+          // metadata: {
+          //   bytecodeHash: "ipfs",
+          // },
           // You should disable the optimizer when debugging
           // https://hardhat.org/hardhat-network/#solidity-optimizer-support
           optimizer: {
@@ -79,14 +79,14 @@ const config: HardhatUserConfig = {
             //   },
             // },
           },
-          viaIR: true
+          // viaIR: true
         },
       },
     ],
   },
-  abiExporter: {
-    flat: true,
-  },
+  // abiExporter: {
+  //   flat: true,
+  // },
   gasReporter: {
     enabled: false
   },
@@ -109,6 +109,14 @@ const config: HardhatUserConfig = {
       'bera-bartio': process.env.BERA_EXPLORER_KEY  || ""
     },
     customChains: [
+      {
+        network: "bera",
+        chainId: 80094,
+        urls: {
+          apiURL: "https://api.berascan.com/api",
+          browserURL: "https://berascan.com"
+        }
+      },
       {
         network: "bera-bartio",
         chainId: 80084,

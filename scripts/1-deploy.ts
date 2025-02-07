@@ -53,20 +53,22 @@ async function main() {
   const redeemPoolFactoryAddress = await deployContract("RedeemPoolFactory", [protocolAddress]);
   const bribesPoolFactoryAddress = await deployContract("BribesPoolFactory", [protocolAddress]);
 
-  const deployVault = async (asset: string, pool: string, name: string, index: number = 1) => {
+  const bQueryAddress = await deployContract("BQuery", []);
+
+  const deployVault = async (asset: string, pool: string, name: string) => {
     const vaultAddress = await deployContract(
       "InfraredBribeVault",
       [protocolAddress, protocolSettingsAddress, redeemPoolFactoryAddress, bribesPoolFactoryAddress, pool, asset, `Zoo p${name}`, `p${name.slice(0, 10)}`],
-      `${name}_${index}_Vault}`,
+      `${name}_Vault`,
       {
         libraries: {
           VaultCalculator: vaultCalculatorAddress,
         },
       }
     );
-    console.info(`${name}_${index}_Vault pToken:`, await Vault__factory.connect(vaultAddress, ethers.provider).pToken());
+    console.info(`${name}_Vault pToken:`, await Vault__factory.connect(vaultAddress, ethers.provider).pToken());
     await addVault(vaultAddress);
-    console.log(`Added vault ${name}_${index} to protocol`);
+    console.log(`Added vault ${name} to protocol`);
   };
 
   const deployYeetVault = async (asset: string, yeetTrifectaVault: string, pTokenName: string, pTokenSymbol: string) => {
@@ -86,7 +88,7 @@ async function main() {
   };
 
   // HONEY-USDC.e
-  await deployVault("0xf961a8f6d8c69e7321e78d254ecafbcc3a637621", "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2", "HONEY-USDC.e", 1);
+  await deployVault("0xf961a8f6d8c69e7321e78d254ecafbcc3a637621", "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2", "HONEY-USDC.e");
 
   // Deploy $HONEY-USDC-LP vault
   // await deployVault("0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96", "0x675547750F4acdf64eD72e9426293f38d8138CA8", "HONEY-USDC-LP", 1);

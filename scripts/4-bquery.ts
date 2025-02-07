@@ -8,16 +8,17 @@ dotenv.config();
 async function main() {
   //   const [root] = await ethers.getSigners();
   const bqueryAddress = await deployContract("BQuery", []);
-  const [deployer] = await ethers.getSigners();
-  const bQuery = BQuery__factory.connect(bqueryAddress, deployer);
-  await bQuery.setCrocQuery("0x8685CE9Db06D40CBa73e3d09e6868FE476B5dC89").then((tx) => tx.wait(2));
-  const lps = ["0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7"];
-  for (const lp of lps) {
-    await bQuery.setLP(lp, true).then((tx) => tx.wait(2));
-  }
-  const vault = '0x12f5F1f53B419d1E5F3084E649001Ff091683ADc';
-  const current = await bQuery.queryBVault(vault);
-  console.info("bVault", current);
+  // const [deployer] = await ethers.getSigners();
+  // const bQuery = BQuery__factory.connect(bqueryAddress, deployer);
+  // await bQuery.setCrocQuery("0x8685CE9Db06D40CBa73e3d09e6868FE476B5dC89").then((tx) => tx.wait(2));
+  // const lps = ["0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7"];
+  // for (const lp of lps) {
+  //   await bQuery.setLP(lp, true).then((tx) => tx.wait(2));
+  // }
+  // const vault = '0x12f5F1f53B419d1E5F3084E649001Ff091683ADc';
+  // const current = await bQuery.queryBVault(vault);
+  // console.info("bVault", current);
+
   // for (let i = current.epochCount; i > 0n; i--) {
   //   console.info("epoch:", i, await bQuery.queryBVaultEpoch(vault, i));
   //   console.info("epoch:", i, await bQuery.queryBVaultEpochUser(vault, i, deployer.address));
