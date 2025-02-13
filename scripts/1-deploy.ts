@@ -19,10 +19,12 @@ async function main() {
   const nonce = await deployer.getNonce();
   console.log("nonce:", nonce);
 
-  const protocolAddress = await deployContract("ZooProtocol", []);
+  // const protocolAddress = await deployContract("ZooProtocol", []);
+  const protocolAddress = "0xc0fA386aE92f18A783476d09121291A1972C30Dc";
   const protocol = ZooProtocol__factory.connect(protocolAddress, deployer);
 
-  const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
+  // const protocolSettingsAddress = await deployContract("ProtocolSettings", [protocolAddress, treasuryAddress]);
+  const protocolSettingsAddress = "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB";
   const settings = ProtocolSettings__factory.connect(protocolSettingsAddress, deployer);
 
   // add Vault to protocol
@@ -49,11 +51,18 @@ async function main() {
   // const stakingPoolAddress = await deployContract("MockStakingPool", [protocolAddress, iREDAddress]);
   // const stakingPool = MockStakingPool__factory.connect(stakingPoolAddress, deployer);
 
-  const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
-  const redeemPoolFactoryAddress = await deployContract("RedeemPoolFactory", [protocolAddress]);
-  const bribesPoolFactoryAddress = await deployContract("BribesPoolFactory", [protocolAddress]);
+  // const vaultCalculatorAddress = await deployContract("VaultCalculator", []);
+  // const redeemPoolFactoryAddress = await deployContract("RedeemPoolFactory", [protocolAddress]);
+  // const bribesPoolFactoryAddress = await deployContract("BribesPoolFactory", [protocolAddress]);
 
-  const bQueryAddress = await deployContract("BQuery", []);
+  const vaultCalculatorAddress = "0x38d913835FA8115B60665d902F05b0Cd772377Fe";
+
+  // const redeemPoolFactoryAddress = "0xF6F4a88ffD26fb14da4cFf997Ca773b06E3b2db3";
+  const redeemPoolFactoryAddress = await deployContract("RedeemPoolFactory", [protocolAddress]);
+
+  const bribesPoolFactoryAddress = "0x550b031acbc56B309A8ef28914959115f6a97202";
+
+  // const bQueryAddress = await deployContract("BQuery", []);
 
   const deployVault = async (asset: string, pool: string, name: string) => {
     const vaultAddress = await deployContract(
@@ -88,7 +97,7 @@ async function main() {
   };
 
   // HONEY-USDC.e
-  await deployVault("0xf961a8f6d8c69e7321e78d254ecafbcc3a637621", "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2", "HONEY-USDC.e");
+  // await deployVault("0xf961a8f6d8c69e7321e78d254ecafbcc3a637621", "0x59945c5be54ff1d8deb0e8bc7f132f950da910a2", "HONEY-USDC.e");
 
   // Deploy $HONEY-USDC-LP vault
   // await deployVault("0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96", "0x675547750F4acdf64eD72e9426293f38d8138CA8", "HONEY-USDC-LP", 1);
@@ -98,6 +107,8 @@ async function main() {
   // await deployVault("0xd28d852cbcc68dcec922f6d5c7a8185dbaa104b7", "0x5c5f9a838747fb83678ECe15D85005FD4F558237", "HONEY-WBERA-LP", 2);
 
   // await deployYeetVault("0x0001513F4a1f86da0f02e647609E9E2c630B3a14", "0x208008F377Ad00ac07A646A1c3eA6b70eB9Fc511", "Zoo pBERAYEET", "pBERAYEET");
+
+  await deployYeetVault("0xec8ba456b4e009408d0776cde8b91f8717d13fa1", "0xd3908da797ecec7ea0fbfbacf3118302e215556c", "Zoo pBERAYEET", "pBERAYEET");
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -294,6 +294,7 @@ contract BQuery is Ownable {
     }
 
     function setCrocQuery(address cq) external onlyOwner {
+        require(cq != address(0), "Zero address detected");
         crocquery = cq;
     }
 }

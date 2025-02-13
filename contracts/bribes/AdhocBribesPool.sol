@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -35,6 +33,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
   /* ========== CONSTRUCTOR ========== */
 
   constructor(address _vault, uint256 _epochEndTimestamp) {
+    require(_vault != address(0), "Zero address dectected");
     vault = _vault;
     epochEndTimestamp = _epochEndTimestamp;
   }
@@ -94,7 +93,6 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
       if (bribes > 0) {
         userBribes[_msgSender()][bribeToken] = 0;
         TokensTransfer.transferTokens(bribeToken, address(this), _msgSender(), bribes);
-        // console.log('getBribes, user: %s, token: %s, bribes: %s', _msgSender(), bribeToken, bribes);
         emit BribesPaid(_msgSender(), bribeToken, bribes);
       }
     }

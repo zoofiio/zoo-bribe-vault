@@ -14,7 +14,7 @@
     "address": "0x38d913835FA8115B60665d902F05b0Cd772377Fe",
     "args": []
   },
-  "RedeemPoolFactory": {
+  "RedeemPoolFactory_V1": {
     "address": "0xF6F4a88ffD26fb14da4cFf997Ca773b06E3b2db3",
     "args": [
       "0xc0fA386aE92f18A783476d09121291A1972C30Dc"
@@ -30,16 +30,6 @@
     "address": "0x6E603014ACE3Ae06F34Ffe259106Af77c056d913",
     "args": []
   },
-  "PToken": {
-    "address": "0x70B851f6877D16D6D5aD546B17d06281b8aBDd4b",
-    "args": [
-      "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
-      "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB",
-      "Zoo pHONEY-USDC.e",
-      "pHONEY-USDC",
-      18
-    ]
-  },
   "HONEY-USDC.e_Vault": {
     "address": "0x33C42E171cFD7Ec85D3dB34D7f6d3D8121f64E63",
     "args": [
@@ -51,6 +41,16 @@
       "0xf961a8f6d8c69e7321e78d254ecafbcc3a637621",
       "Zoo pHONEY-USDC.e",
       "pHONEY-USDC"
+    ]
+  },
+  "HONEY-USDC.e_Vault_PToken": {
+    "address": "0x70B851f6877D16D6D5aD546B17d06281b8aBDd4b",
+    "args": [
+      "0xc0fA386aE92f18A783476d09121291A1972C30Dc",
+      "0x8c6E434Bb1C51728BdCc250255c1F654471d85eB",
+      "Zoo pHONEY-USDC.e",
+      "pHONEY-USDC",
+      18
     ]
   }
 }

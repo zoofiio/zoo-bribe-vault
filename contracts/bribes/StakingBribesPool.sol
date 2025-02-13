@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
@@ -31,6 +29,7 @@ contract StakingBribesPool is Context, ReentrancyGuard {
   /* ========== CONSTRUCTOR ========== */
 
   constructor(address _vault) {
+    require(_vault != address(0), "Zero address dectected");
     vault = _vault;
   }
 

@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -26,7 +23,6 @@ import "../tokens/PToken.sol";
 import "./BriberExtension.sol";
 
 abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, BriberExtension {
-  using Counters for Counters.Counter;
   using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
   using EnumerableSet for EnumerableSet.AddressSet;
   using VaultCalculator for IVault;
@@ -41,7 +37,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   address public immutable pToken;
   uint8 public immutable ytDecimals;
 
-  Counters.Counter internal _currentEpochId;  // default to 0
+  uint256 internal _currentEpochId;  // default to 0
   DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
@@ -89,8 +85,8 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   }
 
   function currentEpochId() public view returns (uint256) {
-    require(_currentEpochId.current() > 0, "No epochs yet");
-    return _currentEpochId.current();
+    require(_currentEpochId > 0, "No epochs yet");
+    return _currentEpochId;
   }
 
   function epochIdCount() public view returns (uint256) {
@@ -155,18 +151,18 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     uint256 yTokenAmount = amount;
     if (!newEpoch) {
       // update X and k0 on new deposit
-      require(_epochNextSwapK0[_currentEpochId.current()] > 0);
+      require(_epochNextSwapK0[_currentEpochId] > 0);
       (uint256 X, uint256 k0) = IVault(this).updateSwapParamsOnDeposit(yTokenAmount);
-      _epochNextSwapX[_currentEpochId.current()] = X;
-      _epochNextSwapK0[_currentEpochId.current()] = k0;
+      _epochNextSwapX[_currentEpochId] = X;
+      _epochNextSwapK0[_currentEpochId] = k0;
     }
 
     // mint yToken to Vault
-    _yTokenTotalSupply[_currentEpochId.current()] = _yTokenTotalSupply[_currentEpochId.current()] + yTokenAmount;
-    _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)] + yTokenAmount;
-    emit YTokenDummyMinted(_currentEpochId.current(), address(this), amount, yTokenAmount);
+    _yTokenTotalSupply[_currentEpochId] = _yTokenTotalSupply[_currentEpochId] + yTokenAmount;
+    _yTokenUserBalances[_currentEpochId][address(this)] = _yTokenUserBalances[_currentEpochId][address(this)] + yTokenAmount;
+    emit YTokenDummyMinted(_currentEpochId, address(this), amount, yTokenAmount);
 
-    emit Deposit(_currentEpochId.current(), _msgSender(), amount, pTokenAmount, yTokenAmount);
+    emit Deposit(_currentEpochId, _msgSender(), amount, pTokenAmount, yTokenAmount);
 
     _updateStakingBribes();
   }
@@ -185,8 +181,8 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
     _onUserAction(0);
 
-    require(_currentEpochId.current() > 0);
-    Constants.Epoch memory epoch = _epochs[_currentEpochId.current()];
+    require(_currentEpochId > 0);
+    Constants.Epoch memory epoch = _epochs[_currentEpochId];
     require(block.timestamp <= epoch.startTime + epoch.duration, "Epoch ended");
 
     TokensTransfer.transferTokens(assetToken, _msgSender(), address(this), amount);
@@ -201,24 +197,24 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     uint256 pTokenAmount = netAmount;
     IPToken(pToken).rebase(pTokenAmount);
 
-    _assetTotalSwapAmount[_currentEpochId.current()] = _assetTotalSwapAmount[_currentEpochId.current()] + netAmount;
+    _assetTotalSwapAmount[_currentEpochId] = _assetTotalSwapAmount[_currentEpochId] + netAmount;
 
-    require(_epochNextSwapK0[_currentEpochId.current()] > 0);
+    require(_epochNextSwapK0[_currentEpochId] > 0);
     (uint256 X, uint256 m) = calcSwap(netAmount);
-    _epochNextSwapX[_currentEpochId.current()] = X;
+    _epochNextSwapX[_currentEpochId] = X;
 
     uint256 yTokenAmount = m;
-    require(_yTokenUserBalances[_currentEpochId.current()][address(this)] >= yTokenAmount, "Not enough yTokens");
-    _yTokenUserBalances[_currentEpochId.current()][address(this)] = _yTokenUserBalances[_currentEpochId.current()][address(this)] - yTokenAmount;
-    _yTokenUserBalances[_currentEpochId.current()][_msgSender()] = _yTokenUserBalances[_currentEpochId.current()][_msgSender()] + yTokenAmount;
+    require(_yTokenUserBalances[_currentEpochId][address(this)] >= yTokenAmount, "Not enough yTokens");
+    _yTokenUserBalances[_currentEpochId][address(this)] = _yTokenUserBalances[_currentEpochId][address(this)] - yTokenAmount;
+    _yTokenUserBalances[_currentEpochId][_msgSender()] = _yTokenUserBalances[_currentEpochId][_msgSender()] + yTokenAmount;
     
-    IBribesPool stakingBribesPool = IBribesPool(_epochs[_currentEpochId.current()].stakingBribesPool);
+    IBribesPool stakingBribesPool = IBribesPool(_epochs[_currentEpochId].stakingBribesPool);
     stakingBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
 
-    IBribesPool adhocBribesPool = IBribesPool(_epochs[_currentEpochId.current()].adhocBribesPool);
+    IBribesPool adhocBribesPool = IBribesPool(_epochs[_currentEpochId].adhocBribesPool);
     adhocBribesPool.notifyYTSwappedForUser(_msgSender(), yTokenAmount);
 
-    emit Swap(_currentEpochId.current(), _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
+    emit Swap(_currentEpochId, _msgSender(), amount, fees, pTokenAmount, yTokenAmount);
 
     _updateStakingBribes();
   }
@@ -236,16 +232,16 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   function close() external nonReentrant whenNotClosed onlyOwner {
     _closed = true;
 
-    if (_currentEpochId.current() > 0) {
+    if (_currentEpochId > 0) {
       // force end current epoch
-      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      Constants.Epoch storage currentEpoch = _epochs[_currentEpochId];
       if (block.timestamp < currentEpoch.startTime + currentEpoch.duration) {
         currentEpoch.duration = block.timestamp - currentEpoch.startTime;
         // Update AdhocBribesPool end timestamp
         IBribesPool adhocBribesPool = IBribesPool(currentEpoch.adhocBribesPool);
         adhocBribesPool.updateEpochEndTimeOnVaultClose(block.timestamp);
       }
-      _onEndEpoch(_currentEpochId.current());
+      _onEndEpoch(_currentEpochId);
       _updateStakingBribes();
     }
 
@@ -288,7 +284,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   function addAdhocBribes(address bribeToken, uint256 amount) external nonReentrant onlyOwnerOrBriber noneZeroAddress(bribeToken) noneZeroAmount(amount) {
     // current epoch may be ended
-    uint256 epochId = _currentEpochId.current();
+    uint256 epochId = _currentEpochId;
     require(epochId > 0);
 
     IBribesPool adhocBribesPool = IBribesPool(_epochs[epochId].adhocBribesPool);
@@ -303,14 +299,14 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   function _onUserAction(uint256 deltaYTokenAmount) internal returns (bool) {
     bool newEpoch = false;
     // Start first epoch
-    if (_currentEpochId.current() == 0) {
+    if (_currentEpochId == 0) {
       _startNewEpoch(deltaYTokenAmount);
       newEpoch = true;
     }
     else {
-      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId.current()];
+      Constants.Epoch memory currentEpoch = _epochs[_currentEpochId];
       if (block.timestamp > currentEpoch.startTime + currentEpoch.duration) {
-        _onEndEpoch(_currentEpochId.current());
+        _onEndEpoch(_currentEpochId);
         _startNewEpoch(deltaYTokenAmount);
         newEpoch = true;
       }
@@ -326,10 +322,10 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   }
 
   function _startNewEpoch(uint256 deltaYTokenAmount) internal {
-    uint256 oldEpochId = _currentEpochId.current();
+    uint256 oldEpochId = _currentEpochId;
 
-    _currentEpochId.increment();
-    uint256 epochId = _currentEpochId.current();
+    _currentEpochId = _currentEpochId + 1;
+    uint256 epochId = _currentEpochId;
     _allEpochIds.pushBack(bytes32(epochId));
 
     _epochs[epochId].epochId = epochId;
@@ -348,10 +344,10 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
     }
 
     // initialize swap params
-    uint256 S = _yTokenUserBalances[_currentEpochId.current()][address(this)] + deltaYTokenAmount;
+    uint256 S = _yTokenUserBalances[_currentEpochId][address(this)] + deltaYTokenAmount;
     (uint256 X, uint256 k0) = IVault(this).calcInitSwapParams(S);
-    _epochNextSwapX[_currentEpochId.current()] = X;
-    _epochNextSwapK0[_currentEpochId.current()] = k0;
+    _epochNextSwapX[_currentEpochId] = X;
+    _epochNextSwapK0[_currentEpochId] = k0;
   }
 
   function _updateStakingBribes() internal {
@@ -406,7 +402,7 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
   modifier validEpochId(uint256 epochId) {
     require(
-      epochId > 0 && epochId <= _currentEpochId.current() && _epochs[epochId].startTime > 0,
+      epochId > 0 && epochId <= _currentEpochId && _epochs[epochId].startTime > 0,
       "Invalid epoch id"
     );
     _;

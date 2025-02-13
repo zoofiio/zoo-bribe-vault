@@ -12,11 +12,6 @@ abstract contract ProtocolOwner is Context {
     protocol = IZooProtocol(_protocol_);
   }
 
-  modifier onlyProtocol() {
-    require(_msgSender() == address(protocol), "Ownable: caller is not the protocol");
-    _;
-  }
-
   modifier onlyOwner() {
     require(_msgSender() == IZooProtocol(protocol).protocolOwner(), "Ownable: caller is not the owner");
     _;

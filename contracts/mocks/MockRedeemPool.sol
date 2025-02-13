@@ -2,13 +2,11 @@
 pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "../vaults/RedeemPool.sol";
 
 contract MockRedeemPool is RedeemPool {
   using Math for uint256;
-  using SafeMath for uint256;
 
   constructor(address _vault_) RedeemPool(_vault_) {
 

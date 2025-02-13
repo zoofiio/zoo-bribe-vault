@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
-
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -24,8 +22,8 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
   IVault internal immutable _vault;
   bool internal _settled;
 
-  address internal _redeemingPToken;  // $piBGT
-  address internal _assetToken;  // $iBGT
+  address internal immutable _redeemingPToken;  // $piBGT
+  address internal immutable _assetToken;  // $iBGT
 
   uint256 internal _totalRedeemingShares;  // $piBGT shares
   mapping(address => uint256) internal _userRedeemingShares;
@@ -42,7 +40,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     _vault = IVault(_vault_);
 
     _redeemingPToken = _vault.pToken();
-    _assetToken = _vault.assetToken();
+    _assetToken = _vault.redeemAssetToken();
   }
 
   /* ========== VIEWS ========== */

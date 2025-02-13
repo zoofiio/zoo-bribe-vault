@@ -15,6 +15,8 @@ interface IVault {
 
   function assetBalance() external view returns (uint256);
 
+  function redeemAssetToken() external view returns (address);
+
   function pToken() external view returns (address);
 
   function paramValue(bytes32 param) external view returns (uint256);

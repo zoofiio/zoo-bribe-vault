@@ -2,13 +2,11 @@
 pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 import "./MockERC20.sol";
 
 contract MockRebasableERC20 is MockERC20 {
   using Math for uint256;
-  using SafeMath for uint256;
 
   constructor(
     address _protocol,
@@ -75,7 +73,7 @@ contract MockRebasableERC20 is MockERC20 {
     require(currentAllowance >= _amount, "TRANSFER_AMOUNT_EXCEEDS_ALLOWANCE");
 
     _transfer(_sender, _recipient, _amount);
-    _approve(_sender, msg.sender, currentAllowance.sub(_amount));
+    _approve(_sender, msg.sender, currentAllowance - _amount);
     return true;
   }
 
@@ -93,7 +91,7 @@ contract MockRebasableERC20 is MockERC20 {
     }
     _mintShares(to, sharesAmount);
 
-    _totalSupply = _totalSupply.add(amount);
+    _totalSupply = _totalSupply + amount;
 
     _emitTransferAfterMintingShares(to, sharesAmount);
 
@@ -109,7 +107,7 @@ contract MockRebasableERC20 is MockERC20 {
     }
     _burnShares(msg.sender, sharesAmount);
 
-    _totalSupply = _totalSupply.sub(amount);
+    _totalSupply = _totalSupply - amount;
 
     emit Transfer(msg.sender, address(0), getBalanceByShares(sharesAmount));
     emit TransferShares(msg.sender, address(0), sharesAmount);
@@ -128,7 +126,7 @@ contract MockRebasableERC20 is MockERC20 {
 
   function addRewards(uint256 amount) external nonReentrant onlyTester {
     require(amount > 0, "Cannot mint 0");
-    _totalSupply = _totalSupply.add(amount);
+    _totalSupply = _totalSupply + amount;
 
     emit AddRewards(msg.sender, amount);
   }
@@ -136,7 +134,7 @@ contract MockRebasableERC20 is MockERC20 {
   function submitPenalties(uint256 amount) external nonReentrant onlyTester {
     require(amount > 0, "Cannot burn 0");
     require(amount <= _totalSupply, "Cannot burn more than total supply");
-    _totalSupply = _totalSupply.sub(amount);
+    _totalSupply = _totalSupply - amount;
 
     emit SubmitPenalties(msg.sender, amount);
   }
@@ -157,8 +155,8 @@ contract MockRebasableERC20 is MockERC20 {
     uint256 currentSenderShares = shares[_sender];
     require(_sharesAmount <= currentSenderShares, "TRANSFER_AMOUNT_EXCEEDS_BALANCE");
 
-    shares[_sender] = currentSenderShares.sub(_sharesAmount);
-    shares[_recipient] = shares[_recipient].add(_sharesAmount);
+    shares[_sender] = currentSenderShares - _sharesAmount;
+    shares[_recipient] = shares[_recipient] + _sharesAmount;
   }
 
   function _approve(address _owner, address _spender, uint256 _amount) internal override {
@@ -172,10 +170,10 @@ contract MockRebasableERC20 is MockERC20 {
   function _mintShares(address _recipient, uint256 _sharesAmount) internal returns (uint256 newTotalShares) {
     require(_recipient != address(0), "MINT_TO_THE_ZERO_ADDRESS");
 
-    newTotalShares = _totalShares.add(_sharesAmount);
+    newTotalShares = _totalShares + _sharesAmount;
     _totalShares = newTotalShares;
 
-    shares[_recipient] = shares[_recipient].add(_sharesAmount);
+    shares[_recipient] = shares[_recipient] + _sharesAmount;
   }
 
   function _burnShares(address _account, uint256 _sharesAmount) internal returns (uint256 newTotalShares) {
@@ -186,10 +184,10 @@ contract MockRebasableERC20 is MockERC20 {
 
     uint256 preRebaseTokenAmount = getBalanceByShares(_sharesAmount);
 
-    newTotalShares = _totalShares.sub(_sharesAmount);
+    newTotalShares = _totalShares - _sharesAmount;
     _totalShares = newTotalShares;
 
-    shares[_account] = accountShares.sub(_sharesAmount);
+    shares[_account] = accountShares - _sharesAmount;
 
     uint256 postRebaseTokenAmount = getBalanceByShares(_sharesAmount);
 

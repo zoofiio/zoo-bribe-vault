@@ -47,6 +47,10 @@ contract MockVault is IVault {
   function assetToken() public view override returns (address) {
     return address(_assetToken);
   }
+
+  function redeemAssetToken() public view returns (address) {
+    return address(_assetToken);
+  }
   
   function assetBalance() public pure returns (uint256) {
     return 0;

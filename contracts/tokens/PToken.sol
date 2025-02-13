@@ -20,7 +20,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   string internal _name_;
   string internal _symbol_;
-  uint8 internal _decimals_;
+  uint8 internal immutable _decimals_;
 
   uint256 private _totalSupply;
 

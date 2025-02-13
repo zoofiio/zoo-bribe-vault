@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-// import "hardhat/console.sol";
-
 import "../interfaces/IStakingPool.sol";
 import "./Vault.sol";
 
@@ -23,6 +21,10 @@ contract InfraredBribeVault is Vault {
     
     stakingPool = IStakingPool(_stakingPool_);
     IERC20(assetToken).approve(address(stakingPool), type(uint256).max);
+  }
+
+  function redeemAssetToken() public view override returns (address) {
+    return assetToken;
   }
 
   /* ========== INTERNAL FUNCTIONS ========== */
