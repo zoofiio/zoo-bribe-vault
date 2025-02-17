@@ -13,11 +13,11 @@ abstract contract ProtocolOwner is Context {
   }
 
   modifier onlyOwner() {
-    require(_msgSender() == IZooProtocol(protocol).protocolOwner(), "Ownable: caller is not the owner");
+    require(_msgSender() == protocol.protocolOwner(), "Ownable: caller is not the owner");
     _;
   }
 
   function owner() public view returns(address) {
-    return IZooProtocol(protocol).protocolOwner();
+    return protocol.protocolOwner();
   }
 }

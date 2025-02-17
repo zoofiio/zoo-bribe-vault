@@ -40,7 +40,6 @@ library VaultCalculator {
     }
     else {
       // in a new epoch
-      deltaT = 0;
       uint256 S = calcNewEpochS(self);
       (X, k0) = calcInitSwapParams(self, S);
     }
@@ -101,7 +100,6 @@ library VaultCalculator {
     } 
     else {
       // in a new epoch
-      deltaT = 0;
       uint256 S = calcNewEpochS(self);
       (X, k0) = calcInitSwapParams(self, S);
     }
@@ -109,19 +107,18 @@ library VaultCalculator {
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
 
     uint256 decayPeriod = self.paramValue("D") / 30;
-    Constants.Terms memory T;
-    T.T1 = SCALE + (
+    uint256 T1 = SCALE + (
       deltaT.mulDiv(SCALE, decayPeriod)
     );  // scale: 18
 
     // X * n * (1 + ∆t / 86400)2
-    T.T2 = X.mulDiv(n.mulDiv(T.T1 * T.T1, SCALE), SCALE);   // scale: 1
+    uint256 T2 = X.mulDiv(n.mulDiv(T1 * T1, SCALE), SCALE);   // scale: 1
 
     // k0 + X * n * (1 + ∆t / 86400)2
-    T.T3 = k0 + T.T2;
+    uint256 T3 = k0 + T2;
 
     // X' = X * k0 / (k0 + X * n * (1 + ∆t / 86400)2)
-    uint256 X_updated = X.mulDiv(k0, T.T3);
+    uint256 X_updated = X.mulDiv(k0, T3);
 
     // m = X - X'
     uint256 m = X - X_updated;

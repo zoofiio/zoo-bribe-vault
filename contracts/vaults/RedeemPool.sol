@@ -75,23 +75,23 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
   }
 
   // $piBGT
-  function userRedeemingBalance(address account) public view onlyBeforeSettlement returns (uint256) {
-    return getRedeemingBalanceByShares(_userRedeemingShares[account]);
+  function userRedeemingBalance(address account) external view onlyBeforeSettlement returns (uint256) {
+    return _convertToAssets(_userRedeemingShares[account], Math.Rounding.Down);
   }
 
   // $iBGT
   function earnedAssetAmount(address account) public view returns (uint256) {
     return _userRedeemingShares[account].mulDiv(
-      _assetAmountPerRedeemingShare - _userAssetAmountPerRedeemingSharePaid[account], 1e28
+      _assetAmountPerRedeemingShare - _userAssetAmountPerRedeemingSharePaid[account], 1e28, Math.Rounding.Down
     ) + _userAssetAmounts[account];
   }
 
-  function getRedeemingSharesByBalance(uint256 stakingBalance) public virtual view onlyBeforeSettlement returns (uint256) {
-    return _convertToShares(stakingBalance);
+  function getRedeemingSharesByBalance(uint256 stakingBalance) external virtual view onlyBeforeSettlement returns (uint256) {
+    return _convertToShares(stakingBalance, Math.Rounding.Down);
   }
 
-  function getRedeemingBalanceByShares(uint256 stakingShares) public virtual view onlyBeforeSettlement returns (uint256) {
-    return _convertToAssets(stakingShares);
+  function getRedeemingBalanceByShares(uint256 stakingShares) external virtual view onlyBeforeSettlement returns (uint256) {
+    return _convertToAssets(stakingShares, Math.Rounding.Down);
   }
 
   // https://docs.openzeppelin.com/contracts/5.x/erc4626
@@ -106,7 +106,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     require(amount > 0, "Cannot redeem 0");
     require(IERC20(_redeemingPToken).balanceOf(_msgSender()) >= amount, "Insufficient balance");
 
-    uint256 sharesAmount = getRedeemingSharesByBalance(amount);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Down);
     _totalRedeemingShares = _totalRedeemingShares + sharesAmount;
     _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] + sharesAmount;
 
@@ -116,9 +116,9 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   function withdrawRedeem(uint256 amount) public nonReentrant whenNotPaused onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     require(amount > 0, "Cannot withdraw 0");
-    require(amount <= userRedeemingBalance(_msgSender()), "Insufficient redeeming balance");
+    require(amount <= _convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Down), "Insufficient redeeming balance");
 
-    uint256 sharesAmount = getRedeemingSharesByBalance(amount);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Up);
     _totalRedeemingShares = _totalRedeemingShares - sharesAmount;
     _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] - sharesAmount;
 
@@ -137,7 +137,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   function exit() external {
     if (!_settled) {
-      withdrawRedeem(userRedeemingBalance(_msgSender()));
+      withdrawRedeem(_convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Down));
     }
     else {
       _claimAssetToken(_msgSender());
@@ -191,19 +191,19 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     }
   }
 
-  function _convertToShares(uint256 assets) internal view virtual returns (uint256) {
+  function _convertToShares(uint256 assets, Math.Rounding rounding) internal view virtual returns (uint256) {
     return assets.mulDiv(
       _totalRedeemingShares + 10 ** decimalsOffset(), 
       totalRedeemingBalance() + 1, 
-      Math.Rounding.Down
+      rounding
     );
   }
 
-  function _convertToAssets(uint256 shares) internal view virtual returns (uint256) {
+  function _convertToAssets(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
     return shares.mulDiv(
       totalRedeemingBalance() + 1,
       _totalRedeemingShares + 10 ** decimalsOffset(),
-      Math.Rounding.Down
+      rounding
     );
   }
 

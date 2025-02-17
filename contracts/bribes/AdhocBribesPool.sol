@@ -98,6 +98,16 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
     }
   }
 
+  function getBribe(address bribeToken) external nonReentrant updateBribes(_msgSender(), bribeToken) {
+    require(_bribeTokens.contains(bribeToken), "Invalid bribe token");
+    uint256 bribes = userBribes[_msgSender()][bribeToken];
+    if (bribes > 0) {
+      userBribes[_msgSender()][bribeToken] = 0;
+      TokensTransfer.transferTokens(bribeToken, address(this), _msgSender(), bribes);
+      emit BribesPaid(_msgSender(), bribeToken, bribes);
+    }
+  }
+
   /* ========== RESTRICTED FUNCTIONS ========== */
 
   function updateEpochEndTimeOnVaultClose(uint256 newEpochEndTimestamp) external nonReentrant onlyVault {
@@ -127,7 +137,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
     emit TimeWeightedYTAdded(user, deltaTimeWeightedYTAmount);
   }
 
-  function addBribes(address bribeToken, uint256 bribesAmount) external nonReentrant onlyVault updateBribes(address(0), bribeToken) {
+  function addBribes(address bribeToken, uint256 bribesAmount) external nonReentrant onlyVault {
     require(_totalSupply > 0, "Cannot add bribes without YT staked");
     require(bribesAmount > 0, "Too small bribes amount");
 

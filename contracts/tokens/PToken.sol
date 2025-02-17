@@ -53,6 +53,10 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return _decimals_;
   }
 
+  function decimalsOffset() public view virtual returns (uint8) {
+    return 8;
+  }
+
   /* ================= IERC20 Views ================ */
 
   function totalSupply() public view returns (uint256) {
@@ -60,7 +64,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   }
 
   function balanceOf(address account) public view returns (uint256) {
-    return getBalanceByShares(_shares[account]);
+    return _convertToBalance(_shares[account], Math.Rounding.Down);
   }
 
   function allowance(address owner, address spender) public view returns (uint256) {
@@ -77,17 +81,12 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return _shares[account];
   }
 
-  function getSharesByBalance(uint256 balance) public view returns (uint256) {
-    // Initial mint
-    if (_totalSupply == 0 || _totalShares == 0) return balance;
-
-    return balance.mulDiv(_totalShares, _totalSupply);
+  function getSharesByBalance(uint256 balance) external view returns (uint256) {
+    return _convertToShares(balance, Math.Rounding.Down);
   }
 
-  function getBalanceByShares(uint256 sharesAmount) public view override returns (uint256) {
-    if (_totalShares == 0) return 0;
-  
-    return sharesAmount.mulDiv(_totalSupply, _totalShares);
+  function getBalanceByShares(uint256 sharesAmount) external view returns (uint256) {
+    return _convertToBalance(sharesAmount, Math.Rounding.Down);
   }
 
   /* ================= IERC20 Functions ================ */
@@ -120,23 +119,13 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     return true;
   }
 
-  /* ========== RESTRICTED FUNCTIONS ========== */
-
-  function setName(string memory _name) external nonReentrant onlyOwner {
-    _name_ = _name;
-  }
-
-  function setSymbol(string memory _symbol) external nonReentrant onlyOwner {
-    _symbol_ = _symbol;
-  }
-
   /* ================= IPToken Functions ================ */
 
   function mint(address to, uint256 amount) external nonReentrant onlyVault returns (uint256) {
     require(to != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
-    uint256 sharesAmount = getSharesByBalance(amount);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Down);
     _mintShares(to, sharesAmount);
     _totalSupply = _totalSupply + amount;
 
@@ -155,7 +144,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     require(account != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
-    uint256 sharesAmount = getSharesByBalance(amount);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Up);
     _burnShares(account, sharesAmount);
     _totalSupply = _totalSupply - amount;
 
@@ -166,13 +155,13 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   function transferShares(address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
     _transferShares(_msgSender(), to, sharesAmount);
-    uint256 tokensAmount = getBalanceByShares(sharesAmount);
+    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Down);
     _emitTransferEvents(_msgSender(), to, tokensAmount, sharesAmount);
     return tokensAmount;
   }
 
   function transferSharesFrom(address sender, address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
-    uint256 tokensAmount = getBalanceByShares(sharesAmount);
+    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Down);
     _spendAllowance(sender, _msgSender(), tokensAmount);
     _transferShares(sender, to, sharesAmount);
     _emitTransferEvents(sender, to, tokensAmount, sharesAmount);
@@ -181,8 +170,24 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   /* ================= INTERNAL Functions ================ */
 
+  function _convertToShares(uint256 balance, Math.Rounding rounding) internal view virtual returns (uint256) {
+    return balance.mulDiv(
+      _totalShares + 10 ** decimalsOffset(),
+      _totalSupply + 1,
+      rounding
+    );
+  }
+
+  function _convertToBalance(uint256 shares, Math.Rounding rounding) internal view virtual returns (uint256) {
+    return shares.mulDiv(
+      _totalSupply + 1,
+      _totalShares + 10 ** decimalsOffset(), 
+      rounding
+    );
+  }
+
   function _transfer(address sender, address to, uint256 amount) internal {
-    uint256 _sharesToTransfer = getSharesByBalance(amount);
+    uint256 _sharesToTransfer = _convertToShares(amount, Math.Rounding.Down);
     _transferShares(sender, to, _sharesToTransfer);
     _emitTransferEvents(sender, to, amount, _sharesToTransfer);
   }

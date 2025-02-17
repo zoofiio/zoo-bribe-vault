@@ -246,6 +246,28 @@ describe('AdhocBribesPool', () => {
     let iBGTCaroBribes = newBribes * ytTimeWeightedCaro / (ytTimeWeightedBob + ytTimeWeightedCaro);
     expectBigNumberEquals(iBGTBobBribes, await bribesPool.earned(Bob.address, await iBGT.getAddress()));
     expectBigNumberEquals(iBGTCaroBribes, await bribesPool.earned(Caro.address, await iBGT.getAddress()));
+
+    // Bob claims bribes for a specific token
+    trans = await bribesPool.connect(Bob).getBribe(await iBGT.getAddress());
+    await expect(trans)
+      .to.emit(bribesPool, 'BribesPaid').withArgs(Bob.address, await iBGT.getAddress(), iBGTBobBribes);
+    await expect(trans).to.changeTokenBalances(
+      iBGT,
+      [Bob.address, await bribesPool.getAddress()],
+      [iBGTBobBribes, -iBGTBobBribes]
+    );
+    expectBigNumberEquals(0n, await bribesPool.earned(Bob.address, await iBGT.getAddress()));
+
+    // Caro claims bribes for a specific token
+    trans = await bribesPool.connect(Caro).getBribe(await iBGT.getAddress());
+    await expect(trans)
+      .to.emit(bribesPool, 'BribesPaid').withArgs(Caro.address, await iBGT.getAddress(), iBGTCaroBribes);
+    await expect(trans).to.changeTokenBalances(
+      iBGT,
+      [Caro.address, await bribesPool.getAddress()],
+      [iBGTCaroBribes, -iBGTCaroBribes]
+    );
+    expectBigNumberEquals(0n, await bribesPool.earned(Caro.address, await iBGT.getAddress()));
   });
 
 });

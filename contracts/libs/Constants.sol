@@ -24,15 +24,4 @@ library Constants {
     uint256 bribeAmount;
   }
 
-  struct Terms {
-    uint256 T1;
-    uint256 T2;
-    uint256 T3;
-    uint256 T4;
-    uint256 T5;
-    uint256 T6;
-    uint256 T7;
-    uint256 T8;
-  }
-
 }

@@ -20,9 +20,7 @@ contract ERC4626BribeVault is Vault {
     string memory _pTokenName, string memory _pTokensymbol
   ) Vault(_protocol, _settings, _redeemPoolFactory, _bribesPoolFactory, _assetToken_, _pTokenName, _pTokensymbol) {
     require(_erc4626 != address(0), "Zero address detected");
-    
     erc4626 = IERC4626(_erc4626);
-    IERC20(assetToken).approve(address(erc4626), type(uint256).max);
   }
 
   function redeemAssetToken() public view override returns (address) {
@@ -37,6 +35,7 @@ contract ERC4626BribeVault is Vault {
   }
 
   function _depositToUnderlyingVault(uint256 amount) internal override {
+    IERC20(assetToken).approve(address(erc4626), amount);
     erc4626.deposit(amount, address(this));
   }
 

@@ -38,7 +38,6 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   uint8 public immutable ytDecimals;
 
   uint256 internal _currentEpochId;  // default to 0
-  DoubleEndedQueue.Bytes32Deque internal _allEpochIds;   // all Epoch Ids, start from 1
   mapping(uint256 => Constants.Epoch) internal _epochs;  // epoch id => epoch info
 
   mapping(uint256 => uint256) internal _assetTotalSwapAmount;
@@ -90,11 +89,12 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
   }
 
   function epochIdCount() public view returns (uint256) {
-    return _allEpochIds.length();
+    return _currentEpochId;
   }
 
   function epochIdAt(uint256 index) public view returns (uint256) {
-    return uint256(_allEpochIds.at(index));
+    require(index < _currentEpochId, "Index out of bounds");
+    return index + 1;
   }
 
   function epochInfoById(uint256 epochId) public view validEpochId(epochId) returns (Constants.Epoch memory) {
@@ -326,7 +326,6 @@ abstract contract Vault is IVault, Pausable, ReentrancyGuard, ProtocolOwner, Bri
 
     _currentEpochId = _currentEpochId + 1;
     uint256 epochId = _currentEpochId;
-    _allEpochIds.pushBack(bytes32(epochId));
 
     _epochs[epochId].epochId = epochId;
     _epochs[epochId].startTime = block.timestamp;

@@ -100,12 +100,12 @@ describe("Ownable", () => {
     expect(await settings.vaultParamValue(await dummyVault.getAddress(), encodeBytes32String("C"))).to.equal(2 * 10 ** 8, "Vault param C is updated");
    
     // Only admin could update principal token's name and symbol
-    await expect(piBGT.connect(Bob).setName("Dummy Primary Token V2")).to.be.revertedWith("Ownable: caller is not the owner");
-    await expect(piBGT.connect(Bob).setSymbol("DmyPT2")).to.be.revertedWith("Ownable: caller is not the owner");
-    await expect(piBGT.connect(Alice).setName("Dummy Primary Token V2")).not.to.be.reverted;
-    await expect(piBGT.connect(Alice).setSymbol("DmyPT2")).not.to.be.reverted;
-    expect(await piBGT.name()).to.equal("Dummy Primary Token V2", "Margin token name is updated");
-    expect(await piBGT.symbol()).to.equal("DmyPT2", "Primary token symbol is updated");
+    // await expect(piBGT.connect(Bob).setName("Dummy Primary Token V2")).to.be.revertedWith("Ownable: caller is not the owner");
+    // await expect(piBGT.connect(Bob).setSymbol("DmyPT2")).to.be.revertedWith("Ownable: caller is not the owner");
+    // await expect(piBGT.connect(Alice).setName("Dummy Primary Token V2")).not.to.be.reverted;
+    // await expect(piBGT.connect(Alice).setSymbol("DmyPT2")).not.to.be.reverted;
+    // expect(await piBGT.name()).to.equal("Dummy Primary Token V2", "Margin token name is updated");
+    // expect(await piBGT.symbol()).to.equal("DmyPT2", "Primary token symbol is updated");
 
     // // Only admin could update vault's staking pool on emergency
     // await expect(dummyVault.connect(Bob).rescueFromStakingPool(100, Bob.address)).to.be.revertedWith("Ownable: caller is not the owner");

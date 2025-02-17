@@ -55,7 +55,7 @@ contract ProtocolSettings is IProtocolSettings, ProtocolOwner, ReentrancyGuard {
   }
 
   function isValidParam(bytes32 param, uint256 value) public view returns (bool) {
-    if (param.length == 0 || !_paramsSet.contains(param)) {
+    if (!_paramsSet.contains(param)) {
       return false;
     }
 
