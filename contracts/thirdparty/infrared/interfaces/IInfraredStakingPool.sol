@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import "../libs/Constants.sol";
+import "../../../libs/Constants.sol";
 
-interface IStakingPool {
+interface IInfraredStakingPool {
 
   function rewardTokens(uint256 index) external view returns (address);
 

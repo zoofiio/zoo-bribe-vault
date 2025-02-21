@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.20;
 
-import "../interfaces/IStakingPool.sol";
-import "./Vault.sol";
+import "./interfaces/IInfraredStakingPool.sol";
+import "../../vaults/Vault.sol";
 
 contract InfraredBribeVault is Vault {
 
-  IStakingPool public stakingPool;
+  IInfraredStakingPool public stakingPool;
 
   constructor(
     address _protocol,
@@ -19,7 +19,7 @@ contract InfraredBribeVault is Vault {
   ) Vault(_protocol, _settings, _redeemPoolFactory, _bribesPoolFactory, _assetToken_, _pTokenName, _pTokensymbol) {
     require(_stakingPool_ != address(0), "Zero address detected");
     
-    stakingPool = IStakingPool(_stakingPool_);
+    stakingPool = IInfraredStakingPool(_stakingPool_);
   }
 
   function redeemAssetToken() public view override returns (address) {

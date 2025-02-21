@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
-import "../vaults/Vault.sol";
+import "../../vaults/Vault.sol";
 
 contract ERC4626BribeVault is Vault {
   using Math for uint256;
