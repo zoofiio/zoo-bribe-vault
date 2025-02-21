@@ -20,7 +20,6 @@ contract InfraredBribeVault is Vault {
     require(_stakingPool_ != address(0), "Zero address detected");
     
     stakingPool = IStakingPool(_stakingPool_);
-    IERC20(assetToken).approve(address(stakingPool), type(uint256).max);
   }
 
   function redeemAssetToken() public view override returns (address) {
@@ -34,6 +33,7 @@ contract InfraredBribeVault is Vault {
   }
 
   function _depositToUnderlyingVault(uint256 amount) internal override {
+    IERC20(assetToken).approve(address(stakingPool), amount);
     stakingPool.stake(amount);
   }
 
