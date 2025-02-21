@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import "../libs/Constants.sol";
 import "../libs/TokensTransfer.sol";
@@ -76,22 +76,22 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   // $piBGT
   function userRedeemingBalance(address account) external view onlyBeforeSettlement returns (uint256) {
-    return _convertToAssets(_userRedeemingShares[account], Math.Rounding.Down);
+    return _convertToAssets(_userRedeemingShares[account], Math.Rounding.Floor);
   }
 
   // $iBGT
   function earnedAssetAmount(address account) public view returns (uint256) {
     return _userRedeemingShares[account].mulDiv(
-      _assetAmountPerRedeemingShare - _userAssetAmountPerRedeemingSharePaid[account], 1e28, Math.Rounding.Down
+      _assetAmountPerRedeemingShare - _userAssetAmountPerRedeemingSharePaid[account], 1e28, Math.Rounding.Floor
     ) + _userAssetAmounts[account];
   }
 
   function getRedeemingSharesByBalance(uint256 stakingBalance) external virtual view onlyBeforeSettlement returns (uint256) {
-    return _convertToShares(stakingBalance, Math.Rounding.Down);
+    return _convertToShares(stakingBalance, Math.Rounding.Floor);
   }
 
   function getRedeemingBalanceByShares(uint256 stakingShares) external virtual view onlyBeforeSettlement returns (uint256) {
-    return _convertToAssets(stakingShares, Math.Rounding.Down);
+    return _convertToAssets(stakingShares, Math.Rounding.Floor);
   }
 
   // https://docs.openzeppelin.com/contracts/5.x/erc4626
@@ -106,7 +106,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
     require(amount > 0, "Cannot redeem 0");
     require(IERC20(_redeemingPToken).balanceOf(_msgSender()) >= amount, "Insufficient balance");
 
-    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Down);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Floor);
     _totalRedeemingShares = _totalRedeemingShares + sharesAmount;
     _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] + sharesAmount;
 
@@ -116,9 +116,9 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   function withdrawRedeem(uint256 amount) public nonReentrant whenNotPaused onlyBeforeSettlement updateAssetAmount(_msgSender()) {
     require(amount > 0, "Cannot withdraw 0");
-    require(amount <= _convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Down), "Insufficient redeeming balance");
+    require(amount <= _convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Floor), "Insufficient redeeming balance");
 
-    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Up);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Ceil);
     _totalRedeemingShares = _totalRedeemingShares - sharesAmount;
     _userRedeemingShares[_msgSender()] = _userRedeemingShares[_msgSender()] - sharesAmount;
 
@@ -137,7 +137,7 @@ contract RedeemPool is Context, Pausable, ReentrancyGuard {
 
   function exit() external {
     if (!_settled) {
-      withdrawRedeem(_convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Down));
+      withdrawRedeem(_convertToAssets(_userRedeemingShares[_msgSender()], Math.Rounding.Floor));
     }
     else {
       _claimAssetToken(_msgSender());

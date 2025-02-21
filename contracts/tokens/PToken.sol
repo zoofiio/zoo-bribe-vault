@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.18;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "../interfaces/IProtocolSettings.sol";
@@ -64,7 +64,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   }
 
   function balanceOf(address account) public view returns (uint256) {
-    return _convertToBalance(_shares[account], Math.Rounding.Down);
+    return _convertToBalance(_shares[account], Math.Rounding.Floor);
   }
 
   function allowance(address owner, address spender) public view returns (uint256) {
@@ -82,11 +82,11 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   }
 
   function getSharesByBalance(uint256 balance) external view returns (uint256) {
-    return _convertToShares(balance, Math.Rounding.Down);
+    return _convertToShares(balance, Math.Rounding.Floor);
   }
 
   function getBalanceByShares(uint256 sharesAmount) external view returns (uint256) {
-    return _convertToBalance(sharesAmount, Math.Rounding.Down);
+    return _convertToBalance(sharesAmount, Math.Rounding.Floor);
   }
 
   /* ================= IERC20 Functions ================ */
@@ -125,7 +125,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     require(to != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
-    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Down);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Floor);
     _mintShares(to, sharesAmount);
     _totalSupply = _totalSupply + amount;
 
@@ -144,7 +144,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
     require(account != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
 
-    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Up);
+    uint256 sharesAmount = _convertToShares(amount, Math.Rounding.Ceil);
     _burnShares(account, sharesAmount);
     _totalSupply = _totalSupply - amount;
 
@@ -155,13 +155,13 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
 
   function transferShares(address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
     _transferShares(_msgSender(), to, sharesAmount);
-    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Down);
+    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Floor);
     _emitTransferEvents(_msgSender(), to, tokensAmount, sharesAmount);
     return tokensAmount;
   }
 
   function transferSharesFrom(address sender, address to, uint256 sharesAmount) external nonReentrant returns (uint256) {
-    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Down);
+    uint256 tokensAmount = _convertToBalance(sharesAmount, Math.Rounding.Floor);
     _spendAllowance(sender, _msgSender(), tokensAmount);
     _transferShares(sender, to, sharesAmount);
     _emitTransferEvents(sender, to, tokensAmount, sharesAmount);
@@ -187,7 +187,7 @@ contract PToken is IPToken, ProtocolOwner, ReentrancyGuard {
   }
 
   function _transfer(address sender, address to, uint256 amount) internal {
-    uint256 _sharesToTransfer = _convertToShares(amount, Math.Rounding.Down);
+    uint256 _sharesToTransfer = _convertToShares(amount, Math.Rounding.Floor);
     _transferShares(sender, to, _sharesToTransfer);
     _emitTransferEvents(sender, to, amount, _sharesToTransfer);
   }
