@@ -19,4 +19,6 @@ interface IPTokenV2 is IERC20 {
   function transferSharesFrom(address sender, address to, uint256 sharesAmount) external returns (uint256);
 
   function rebase(uint256 addedSupply, uint256 duration) external;
+
+  function flushRebase() external;
 }

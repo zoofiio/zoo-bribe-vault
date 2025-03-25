@@ -316,6 +316,8 @@ abstract contract VaultV2 is IVault, Pausable, ReentrancyGuard, ProtocolOwner, B
   }
 
   function _onEndEpoch(uint256 epochId) internal {
+    IPTokenV2(pToken).flushRebase();
+    
     Constants.Epoch memory epoch = _epochs[epochId];
     IRedeemPool redeemPool = IRedeemPool(epoch.redeemPool);
     _settleRedeemPool(redeemPool);

@@ -131,6 +131,21 @@ contract PTokenV2 is IPTokenV2, ProtocolOwner, ReentrancyGuard {
 
   /* ================= IPToken Functions ================ */
 
+  function flushRebase() external nonReentrant onlyVault {
+    _settleRebase();
+
+    if (rebaseFinish > block.timestamp) {
+      uint256 settleAmount = (rebaseFinish - block.timestamp).mulDiv(rebaseRate, RebaseRateScale, Math.Rounding.Floor);
+      _totalSupply = _totalSupply + settleAmount;
+      emit FlushRebased(settleAmount);
+
+      // reset rebase settings
+      rebaseFinish = 0;
+      rebaseRate = 0;
+      lastRebaseSettleTime = 0;
+    }
+  }
+
   function mint(address to, uint256 amount) external nonReentrant onlyVault returns (uint256) {
     require(to != address(0), "Zero address detected");
     require(amount > 0, 'Amount too small');
@@ -292,4 +307,5 @@ contract PTokenV2 is IPTokenV2, ProtocolOwner, ReentrancyGuard {
 
   event TransferShares(address indexed from, address indexed to, uint256 sharesValue);
   event Rebased(uint256 addedSupply, uint256 duration);
+  event FlushRebased(uint256 flushedRebase);
 }

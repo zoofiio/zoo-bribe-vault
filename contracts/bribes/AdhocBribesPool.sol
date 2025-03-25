@@ -29,6 +29,7 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
   uint256 internal _totalSupply;
   mapping(address => uint256) internal _balances;
+  uint256 internal _maxTotalSupply;
 
   /* ========== CONSTRUCTOR ========== */
 
@@ -46,6 +47,10 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
   function balanceOf(address user) external view returns (uint256) {
     return _balances[user];
+  }
+
+  function maxTotalSupply() external view returns (uint256) {
+    return _maxTotalSupply;
   }
 
   function collectableYT(address user) public view returns (uint256, uint256) {
@@ -126,6 +131,10 @@ contract AdhocBribesPool is Context, ReentrancyGuard {
 
     ytSum[user] = ytSum[user] + deltaYTAmount;
     ytLastCollectTime[user] = ytCollectTimestamp;
+
+    if (block.timestamp < epochEndTimestamp) {
+      _maxTotalSupply = _maxTotalSupply + deltaYTAmount * (epochEndTimestamp - block.timestamp);
+    }
   }
 
   function _notifyYTCollectedForUser(address user, uint256 deltaTimeWeightedYTAmount) internal updateAllBribes(user) {
