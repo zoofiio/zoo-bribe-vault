@@ -5,7 +5,7 @@ import "../../../libs/Constants.sol";
 
 interface IInfraredStakingPool {
 
-  function rewardTokens(uint256 index) external view returns (address);
+  function getAllRewardTokens() external view returns (address[] memory);
 
   function balanceOf(address account) external view returns (uint256);
 

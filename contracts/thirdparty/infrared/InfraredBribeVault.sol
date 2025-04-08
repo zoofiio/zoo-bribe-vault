@@ -49,19 +49,9 @@ contract InfraredBribeVault is Vault {
   }
 
   function _doUpdateStakingBribes(IBribesPool stakingBribesPool) internal override {
-    uint256 rewardTokensCount = 0;
-    while(true) {
-      try stakingPool.rewardTokens(rewardTokensCount) returns (address) {
-        rewardTokensCount++;
-      } catch {
-        break;
-      }
-    }
-
-    address[] memory rewardTokens = new address[](rewardTokensCount);
-    uint256[] memory prevBalances = new uint256[](rewardTokensCount);
+    address[] memory rewardTokens = stakingPool.getAllRewardTokens();
+    uint256[] memory prevBalances = new uint256[](rewardTokens.length);
     for (uint256 i = 0; i < rewardTokens.length; i++) {
-      rewardTokens[i] = stakingPool.rewardTokens(i);
       prevBalances[i] = IERC20(rewardTokens[i]).balanceOf(address(this));
     }
 
