@@ -1,0 +1,57 @@
+{
+  "BQuery": {
+    "address": "0x736f5165CB3c0C2831B05265cc29119A0a1DfAA4",
+    "args": []
+  },
+  "ZooProtocol": {
+    "address": "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1",
+    "args": []
+  },
+  "ProtocolSettings": {
+    "address": "0x45a47E8013425AF3e6e71f1aa24e3B8c523386EA",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1",
+      "0x54c56e149f6d655aa784678057d1f96612b0cf1a"
+    ]
+  },
+  "RedeemPoolFactory": {
+    "address": "0x64Ae2C9c53E0ebd068Cc5fFb3D23E217142d66d9",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1"
+    ]
+  },
+  "BribesPoolFactory": {
+    "address": "0x2cBE935Ab14F19Bf8062AA5361134a0Eaac70078",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1"
+    ]
+  },
+  "VaultCalculator": {
+    "address": "0x831DC0DABe78B245c51F701ca21FB25760189c69",
+    "args": []
+  },
+  "HONEY-BYUSD_InfraredBribeVaultV2": {
+    "address": "0x702B707c2F8dd26F4F1e51cF425035d355A02767",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1",
+      "0x45a47E8013425AF3e6e71f1aa24e3B8c523386EA",
+      "0x64Ae2C9c53E0ebd068Cc5fFb3D23E217142d66d9",
+      "0x2cBE935Ab14F19Bf8062AA5361134a0Eaac70078",
+      "0xbbb228b0d7d83f86e23a5ef3b1007d0100581613",
+      "0xde04c469ad658163e2a5e860a03a86b52f6fa8c8",
+      "Zoo pHONEY-BYUSD",
+      "pHONEYBYUSD"
+    ]
+  },
+  "HONEY-BYUSD_InfraredBribeVaultV2_PTokenV2": {
+    "contract": "zoo-bribe-vault/contracts/tokens/PTokenV2.sol:PTokenV2",
+    "address": "0xA58f5A2487abaBc5c5A23E3e3796E6615d12FCaf",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1",
+      "0x45a47E8013425AF3e6e71f1aa24e3B8c523386EA",
+      "Zoo pHONEY-BYUSD",
+      "pHONEYBYUSD",
+      18
+    ]
+  }
+}

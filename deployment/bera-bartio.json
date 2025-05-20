@@ -1,0 +1,46 @@
+{
+  "BQuery": {
+    "address": "0xD4EA290223Ae45EBe87E36f2500270b1CA404Ef7",
+    "args": []
+  },
+  "Protocol": {
+    "address": "0x596158aB8598acDF46b6D4e9cD48827755aC4527",
+    "args": []
+  },
+  "ProtocolSettings": {
+    "address": "0xBe824bfE01A78b5c42e0830ede7fB9fefABD6458",
+    "args": [
+      "0x596158aB8598acDF46b6D4e9cD48827755aC4527",
+      "0x54c56e149f6d655aa784678057d1f96612b0cf1a"
+    ]
+  },
+  "RedeemPoolFactory": {
+    "address": "0x767Fe539b32a42Fc5dBCe5b20d8dEA01Da47eBd4",
+    "args": [
+      "0x596158aB8598acDF46b6D4e9cD48827755aC4527"
+    ]
+  },
+  "BribesPoolFactory": {
+    "address": "0x282425c7fC8566b45ca18aDD90BA9aE7e4e875Ae",
+    "args": [
+      "0x596158aB8598acDF46b6D4e9cD48827755aC4527"
+    ]
+  },
+  "VaultCalculator": {
+    "address": "0x785AeEb675A25034763710Ac46Dcd0799cf25293",
+    "args": []
+  },
+  "HONEY-USDC-LP_InfraredBribeVault": {
+    "address": "0x1BfE2a441f9D45F6AE84F2147Bb4B0AE6B053051",
+    "args": [
+      "0x596158aB8598acDF46b6D4e9cD48827755aC4527",
+      "0xBe824bfE01A78b5c42e0830ede7fB9fefABD6458",
+      "0x767Fe539b32a42Fc5dBCe5b20d8dEA01Da47eBd4",
+      "0x282425c7fC8566b45ca18aDD90BA9aE7e4e875Ae",
+      "0x675547750F4acdf64eD72e9426293f38d8138CA8",
+      "0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96",
+      "Zoo pHONEY-USDC-LP",
+      "pHONEY-USDC"
+    ]
+  }
+}
