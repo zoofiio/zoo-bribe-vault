@@ -53,5 +53,18 @@
       "pHONEYBYUSD",
       18
     ]
+  },
+  "WETH-WBERA_InfraredBribeVaultV2": {
+    "address": "0xf579c039c52ab795F0C4E358d3b462bE883cDd9F",
+    "args": [
+      "0xd75Dc0496826FF0C13cE6D6aA5Bf8D64126E4fF1",
+      "0x45a47E8013425AF3e6e71f1aa24e3B8c523386EA",
+      "0x64Ae2C9c53E0ebd068Cc5fFb3D23E217142d66d9",
+      "0x2cBE935Ab14F19Bf8062AA5361134a0Eaac70078",
+      "0x33e53c508ecFBF6DB7B07AC3A36079fBfA919352",
+      "0x9659dc8c1565e0bd82627267e3b4eed1a377ebe6",
+      "Zoo pWETH-WBERA",
+      "pWETHWBERA"
+    ]
   }
 }

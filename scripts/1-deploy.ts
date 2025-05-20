@@ -84,7 +84,10 @@ async function main() {
   // await deployVault("0xdd70a5ef7d8cfe5c5134b5f9874b09fb5ce812b4", "0x0dF14916796854d899576CBde69a35bAFb923c22", "WBERA-WETH", "pWBERAWETH");
 
   // HONEY-BYUSD
-  await deployVault("0xde04c469ad658163e2a5e860a03a86b52f6fa8c8", "0xbbb228b0d7d83f86e23a5ef3b1007d0100581613", "HONEY-BYUSD", "pHONEYBYUSD");
+  // await deployVault("0xde04c469ad658163e2a5e860a03a86b52f6fa8c8", "0xbbb228b0d7d83f86e23a5ef3b1007d0100581613", "HONEY-BYUSD", "pHONEYBYUSD");
+
+  // Kodiak Island WETH-WBERA
+  await deployVault("0x9659dc8c1565e0bd82627267e3b4eed1a377ebe6", "0x33e53c508ecFBF6DB7B07AC3A36079fBfA919352", "WETH-WBERA", "pWETHWBERA");
 
   // Bera bArtio Testnet: Deploy $HONEY-USDC-LP vault
   // await deployVault("0xD69ADb6FB5fD6D06E6ceEc5405D95A37F96E3b96", "0x675547750F4acdf64eD72e9426293f38d8138CA8", "HONEY-USDC-LP");
